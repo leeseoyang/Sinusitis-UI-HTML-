@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>부비동염 판별기</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #121212;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: #67d3e0;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(255,255,255,0.1);
+        }
+        input[type="file"] {
+            padding: 10px;
+            color: #fff;
+        }
+        input[type="submit"] {
+            padding: 10px 20px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #2c2c2c;
+            border: 2px solid #444;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .chart-container {
+            width: 600px;
+            margin-top: 30px;
+        }
+        .preview-img {
+            margin-top: 20px;
+            border-radius: 10px;
+            max-height: 300px;
+        }
+        .gradcam-img {
+            margin-top: 30px;
+            border-radius: 10px;
+            max-height: 320px;
+        }
+        .emoji {
+            font-size: 40px;
+        }
+    </style>
+</head>
+<body>
+    <img src="/static/logo.png" alt="Logo" style="width:80px;">
+    <h1>부비동염 판별기</h1>
+    <form action="/predict" method="post" enctype="multipart/form-data">
+        <input type="file" name="image" accept="image/*" required onchange="previewImage(event)">
+        <input type="submit" value="예측하기">
+    </form>
+
+    {% if image_data %}
+        <img class="preview-img" src="data:image/png;base64,{{ image_data }}">
+    {% endif %}
+
+    {% if prediction %}
+        <div class="result">
+            예측 결과: <span style="color:#80dfff">{{ prediction }}</span> 
+            (<span style="color:#ff9933">{{ confidence | round(2) }}%</span>)
+        </div>
+
+        <div class="chart-container">
+            <canvas id="barChart"></canvas>
+        </div>
+
+        <script>
+            const ctx = document.getElementById('barChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: {{ class_names|tojson }},
+                    datasets: [{
+                        label: '예측 확률 (%)',
+                        data: {{ probs|tojson }},
+                        backgroundColor: '#40c4ff'
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1.0
+                        }
+                    }
+                }
+            });
+        </script>
+    {% endif %}
+
+    {% if guided_gradcam_img %}
+        <h3>Guided Grad-CAM 시각화</h3>
+        <img class="gradcam-img" src="data:image/png;base64,{{ guided_gradcam_img }}">
+    {% endif %}
+
+    <script>
+        function previewImage(event) {
+            const reader = new FileReader();
+            reader.onload = function(){
+                const output = document.querySelector('.preview-img');
+                if (!output) {
+                    const img = document.createElement("img");
+                    img.className = "preview-img";
+                    img.src = reader.result;
+                    document.body.appendChild(img);
+                } else {
+                    output.src = reader.result;
+                }
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+    </script>
+</body>
+</html>
+<!-- This HTML template is used to render the main page of the sinusitis classifier web application.
+     It includes a form for image upload, displays prediction results, and visualizes the model's confidence
+     using a bar chart. The design is responsive and user-friendly, with a dark theme and clear layout. -->
