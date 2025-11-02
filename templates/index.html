@@ -292,23 +292,10 @@
         </form>
 
         {% if prediction %}
-        <div class="prediction-result" role="status" aria-live="polite">
-          <div class="prediction-header">
-            <h3>진단 결과</h3>
-          </div>
-          
-          <div class="prediction-summary">
-            <div class="prediction-label">{{ prediction }}</div>
-            <div class="prediction-confidence">{{ confidence | round(1) }}%</div>
-          </div>
-          
-          <div class="confidence-bar">
-            <div class="confidence-fill" data-confidence="{{ confidence }}"></div>
-          </div>
-          
-          <div class="prediction-details">
-            <span>신뢰도: {{ confidence | round(2) }}%</span>
-            <span>{% if model_type == '8class' %}정밀 진단{% else %}빠른 진단{% endif %}</span>
+        <div class="simple-result" style="margin-top:16px; padding:12px; background:var(--surface-2); border-radius:6px; text-align:center;">
+          <div style="color:var(--text); font-weight:600;">{{ prediction }}</div>
+          <div style="color:var(--muted); font-size:13px; margin-top:4px;">
+            {% if model_type == '8class' %}정밀 진단{% else %}빠른 진단{% endif %} 완료
           </div>
         </div>
         {% endif %}
@@ -334,7 +321,29 @@
       <aside class="card" aria-labelledby="visualTitle">
         <h2 id="visualTitle">분석 결과 시각화</h2>
 
-        <div class="chart-card" style="margin-top:10px">
+        {% if prediction %}
+        <div class="prediction-result" role="status" aria-live="polite">
+          <div class="prediction-header">
+            <h3>진단 결과</h3>
+          </div>
+          
+          <div class="prediction-summary">
+            <div class="prediction-label">{{ prediction }}</div>
+            <div class="prediction-confidence">{{ confidence | round(1) }}%</div>
+          </div>
+          
+          <div class="confidence-bar">
+            <div class="confidence-fill" data-confidence="{{ confidence }}"></div>
+          </div>
+          
+          <div class="prediction-details">
+            <span>신뢰도: {{ confidence | round(2) }}%</span>
+            <span>{% if model_type == '8class' %}정밀 진단{% else %}빠른 진단{% endif %}</span>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="chart-card" style="margin-top:16px">
           <canvas id="barChart" aria-label="각 클래스별 예측 확률 분포" role="img" height="160"></canvas>
         </div>
 
