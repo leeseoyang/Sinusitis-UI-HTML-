@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>부비동염 판별기 — Demo (건양대학교 테마)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0f1115;
+      --surface:#171a21;
+      --surface-2:#1e2230;
+      --border:#273043;
+      --text:#e8eef8;
+      --muted:#a7b3c6;
+      --kyu-dark:#0b5b36;
+      --kyu-light:#8fd473;
+      --primary:var(--kyu-light);
+      --accent:var(--kyu-dark);
+      --warn:#ff9933;
+      --focus:#8ab4f8;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --radius:14px;
+      --gap:16px;
+      --maxw:1100px;
+      --logo-size:56px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial;
+      margin:0; background:var(--bg); color:var(--text);
+      display:flex; justify-content:center; padding:28px;
+    }
+    .container{ width:min(var(--maxw), 96vw); }
+
+    header{ display:flex; gap:12px; align-items:center; margin-bottom:18px; }
+    .logo-wrap{ width:var(--logo-size); height:var(--logo-size); border-radius:10px; overflow:hidden; display:flex;align-items:center;justify-content:center; background:linear-gradient(180deg,var(--kyu-dark),var(--kyu-light)); flex:0 0 auto;}
+    .logo-wrap img{ width:100%; height:100%; object-fit:contain; display:block; }
+    header h1{ margin:0; font-size: clamp(20px, 3vw, 28px); color:var(--primary); letter-spacing:.2px;}
+    header .sub{ color:var(--muted); font-size:13px; margin-top:4px;}
+
+    .grid{ display:grid; grid-template-columns: 1.15fr 1fr; gap:22px; }
+    @media(max-width:920px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      background: linear-gradient(180deg,var(--surface),var(--surface-2));
+      border-radius:var(--radius);
+      border:1px solid var(--border);
+      box-shadow:var(--shadow);
+      padding:20px;
+    }
+    .card h2{ margin:0 0 12px; color:#cfe8ff; font-size:18px }
+    .hint { color:var(--muted); font-size:13px; margin-top:6px; }
+
+    .dropzone{
+      border:1.5px dashed rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.01);
+      border-radius:12px; padding:18px; text-align:center; cursor:pointer;
+    }
+    .dropzone:focus, .dropzone.drag{ outline:3px solid rgba(138,180,248,0.12); }
+    .title{ font-weight:700; margin-bottom:6px; color:#d8efff;}
+    .small{ color:var(--muted); font-size:13px; }
+
+    .actions{ display:flex; gap:10px; margin-top:12px; align-items:center; flex-wrap:wrap }
+    .btn{
+      padding:10px 14px; border-radius:10px; border:1px solid var(--border);
+      background:#1b2331; color:var(--text); font-weight:700; cursor:pointer;
+    }
+    .btn:focus{ outline:2px solid var(--focus); outline-offset:3px; }
+    .btn--primary{ background: linear-gradient(90deg,var(--kyu-light),var(--kyu-dark)); color:#021212; border:none; }
+    .result-badge{ display:inline-flex; gap:10px; align-items:center; padding:10px 12px; border-radius:12px; background: rgba(16,33,40,0.55); border:1px solid rgba(36,74,87,0.3); margin-top:10px; font-weight:700; }
+    .result-badge .label{ color:#9ad7e5;} .result-badge .pred{ color:var(--kyu-light); } .result-badge .conf{ color:var(--warn); }
+    .media img{ width:100%; height:auto; border-radius:12px; border:1px solid var(--border); object-fit:contain; background:#0c0f14; max-height:420px; }
+    .chart-card{ padding:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent); border-radius:10px; border:1px solid rgba(255,255,255,0.02); }
+    .sr-only{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
+    @keyframes fadeInUp { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+    .card, img, canvas, .result-badge{ animation: fadeInUp .28s ease both; }
+  </style>
+</head>
+<body>
+  <div class="container" role="main" aria-label="부비동염 판별기">
+    <header>
+      <div class="logo-wrap" id="logoWrap" aria-hidden="false">
+        <img id="pageLogo" src="logo.png" alt="건양대학교 로고" onerror="this.style.display='none'; document.getElementById('logoText').style.display='block'">
+        <div id="logoText" style="display:none;color:#fff;font-weight:800">KONYANG</div>
+      </div>
+      <div>
+        <h1>부비동염 판별기</h1>
+        <div class="sub">X-ray 이미지를 업로드하면 결과를 제공합니다.</div>
+      </div>
+
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <div role="group" aria-label="로고 크기 제어" style="display:flex; gap:6px;">
+          <button class="btn" id="logoSmallBtn" title="작게" aria-pressed="false">작게</button>
+          <button class="btn btn--primary" id="logoMidBtn" title="중간" aria-pressed="true">중간</button>
+          <button class="btn" id="logoLargeBtn" title="크게" aria-pressed="false">크게</button>
+        </div>
+        <button class="btn" id="changeLogoBtn" title="로고 교체">로고 교체</button>
+        <input id="logoUpload" type="file" accept=".svg,/Sinusitis-UI-HTML--1/static/logo.png, class="sr-only" />
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: upload & preview -->
+      <section class="card" aria-labelledby="uploadTitle">
+        <h2 id="uploadTitle">1) 이미지 업로드</h2>
+
+        <!-- ✅ 서버 제출용 폼 -->
+        <form id="predictForm" action="/predict" method="post" enctype="multipart/form-data">
+          <label class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="이미지 업로드 영역">
+            <div class="title">이미지를 드래그 & 드롭 또는 클릭하여 선택</div>
+            <div class="small">지원: JPG / PNG · 최대 1장 · 개인정보 주의</div>
+            <!-- ✅ 여기! name을 image로 (백엔드: request.files['image']) -->
+            <input id="fileInput" type="file" name="image" accept="image/*" style="display:none" required />
+          </label>
+
+          <div class="actions" style="margin-top:12px">
+            <button type="button" class="btn" id="chooseBtn">파일 선택</button>
+            <button type="submit" class="btn btn--primary" id="predictBtn" disabled>예측하기</button>
+            <button type="button" class="btn" id="exportBtn">PDF 내보내기</button>
+            <span id="statusText" class="small" aria-live="polite" role="status">준비</span>
+          </div>
+        </form>
+
+        {% if prediction %}
+        <div class="result-badge" role="status" aria-live="polite">
+          <span class="label">예측 결과:</span>
+          <span class="pred">&nbsp;{{ prediction }}&nbsp;</span>
+          <span class="label">신뢰도:</span>
+          <span class="conf">&nbsp;{{ confidence | round(2) }}%</span>
+        </div>
+        {% endif %}
+        <div class="actions" style="margin-top:10px">
+          <button type="button" class="btn" id="resetBtn">다시 예측하기</button>
+        </div>
+
+        <div id="previewWrap" style="margin-top:14px; display:none">
+          <h3 style="margin:6px 0 8px; color:#cfe8ff">입력 이미지 (미리보기)</h3>
+          <div class="media"><img id="previewImg" alt="업로드 미리보기" /></div>
+        </div>
+
+        {% if image_data %}
+        <div style="margin-top:14px">
+          <h3 style="margin:6px 0 8px; color:#cfe8ff">입력 이미지</h3>
+          <div class="media"><img src="data:image/png;base64,{{ image_data }}" alt="업로드된 X-ray 이미지" /></div>
+        </div>
+        {% endif %}
+      </section>
+
+      <!-- RIGHT: charts & grad-cam -->
+      <aside class="card" aria-labelledby="visualTitle">
+        <h2 id="visualTitle">2) 예측 분포 & 시각화</h2>
+
+        <div class="chart-card" style="margin-top:10px">
+          <canvas id="barChart" aria-label="클래스별 예측 확률 막대 차트" role="img" height="160"></canvas>
+        </div>
+
+        {% if boxed_image_data %}
+        <div style="margin-top:12px">
+          <h3 style="margin:8px 0 8px; color:#cfe8ff">자동 추적 결과 (박스)</h3>
+          <div class="media">
+            <img src="data:image/png;base64,{{ boxed_image_data }}" alt="상악동 박스 자동 추적 결과" />
+          </div>
+          {% if left_score is defined and right_score is defined %}
+          <p class="hint" style="margin-top:8px">좌측: {{ (left_score * 100) | round(1) }}% · 우측: {{ (right_score * 100) | round(1) }}%</p>
+          {% endif %}
+        </div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+
+  <div id="srStatus" class="sr-only" role="status" aria-live="polite"></div>
+
+  <script>
+    // 다시 예측하기 버튼 동작 (이벤트 위임)
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) {
+      resetBtn.disabled = false;
+      resetBtn.addEventListener('click', function(){
+        const form = document.getElementById('predictForm');
+        form.reset();
+        previewWrap.style.display = 'none';
+        fileInput.value = '';
+        predictBtn.disabled = true;
+        setTimeout(() => { fileInput.click(); }, 100);
+      });
+    }
+    function announce(msg){ document.getElementById('srStatus').textContent = msg; }
+
+    // Logo controls
+    const logoUpload = document.getElementById('logoUpload');
+    const pageLogo = document.getElementById('pageLogo');
+    const logoText = document.getElementById('logoText');
+    const smallBtn = document.getElementById('logoSmallBtn');
+    const midBtn = document.getElementById('logoMidBtn');
+    const largeBtn = document.getElementById('logoLargeBtn');
+
+    function setLogoSize(px){
+      document.documentElement.style.setProperty('--logo-size', px + 'px');
+      smallBtn.setAttribute('aria-pressed', px===40);
+      midBtn.setAttribute('aria-pressed', px===56);
+      largeBtn.setAttribute('aria-pressed', px===80);
+      announce(`로고 크기 ${px} 픽셀로 설정됨`);
+    }
+    smallBtn.addEventListener('click', ()=> setLogoSize(40));
+    midBtn.addEventListener('click', ()=> setLogoSize(56));
+    largeBtn.addEventListener('click', ()=> setLogoSize(80));
+    document.getElementById('changeLogoBtn').addEventListener('click', ()=> logoUpload.click());
+    logoUpload.addEventListener('change', async (ev)=>{
+      const f = ev.target.files && ev.target.files[0];
+      if(!f) return;
+      if(f.size > 5*1024*1024){ alert('5MB 이하 파일을 사용하세요.'); return; }
+      const ext = f.name.split('.').pop().toLowerCase();
+      if(ext === 'svg'){
+        const text = await f.text();
+        const blob = new Blob([text], {type: 'image/svg+xml'});
+        pageLogo.src = URL.createObjectURL(blob);
+        pageLogo.style.display = 'block'; logoText.style.display = 'none';
+      } else {
+        const reader = new FileReader();
+        reader.onload = ()=>{ pageLogo.src = reader.result; pageLogo.style.display='block'; logoText.style.display='none';}
+        reader.readAsDataURL(f);
+      }
+      announce('로고가 교체되었습니다');
+    });
+
+    // Drag & Drop + Preview + Submit enable
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');  // name="image"
+    const chooseBtn = document.getElementById('chooseBtn');
+    const predictBtn = document.getElementById('predictBtn');
+    const previewWrap = document.getElementById('previewWrap');
+    const previewImg = document.getElementById('previewImg');
+    const statusText = document.getElementById('statusText');
+
+    function enableSubmitIfFile(){
+      predictBtn.disabled = !(fileInput.files && fileInput.files.length > 0);
+    }
+
+    chooseBtn.addEventListener('click', ()=> fileInput.click());
+    dropzone.addEventListener('click', ()=> fileInput.click());
+    dropzone.addEventListener('dragover', (e)=> { e.preventDefault(); dropzone.classList.add('drag'); });
+    dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag'));
+    dropzone.addEventListener('drop', (e)=> {
+      e.preventDefault(); dropzone.classList.remove('drag');
+      if(e.dataTransfer.files && e.dataTransfer.files[0]) {
+        // 드롭한 파일을 input에 세팅
+        const dt = new DataTransfer();
+        for(const f of e.dataTransfer.files) dt.items.add(f);
+        fileInput.files = dt.files;
+        handlePreview(fileInput.files[0]);
+      }
+    });
+    dropzone.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+
+    fileInput.addEventListener('change', (e)=> {
+      if(e.target.files && e.target.files[0]) handlePreview(e.target.files[0]);
+    });
+
+    function handlePreview(file){
+      statusText.textContent = '이미지 로드 중...';
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        previewImg.src = reader.result;
+        previewWrap.style.display = 'block';
+        statusText.textContent = '이미지 준비 완료';
+        enableSubmitIfFile();              // ✅ 파일 선택 시 제출 가능
+        announce('이미지 준비 완료');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Chart (서버 값 사용)
+    (function initChart(){
+      const canvas = document.getElementById('barChart');
+      if(!canvas) return;
+
+      try {
+        const labels = JSON.parse('{{ class_names|tojson|safe if class_names is defined else "[]" }}');
+        const raw = JSON.parse('{{ (probs|tojson|safe if probs is defined else "[]") }}');
+
+        if(!Array.isArray(labels) || !Array.isArray(raw) || labels.length === 0 || raw.length === 0){
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#a7b3c6';
+          ctx.font = '14px system-ui';
+          ctx.fillText('예측 후 결과가 여기에 표시됩니다.', 12, 22);
+          return;
+        }
+
+        const dataPct = raw.map(v => Math.max(0, Math.min(100, v * 100)));
+
+        new Chart(canvas.getContext('2d'), {
+          type: 'bar',
+          data: { labels, datasets: [{ data: dataPct, borderWidth:0, backgroundColor: labels.map(()=>'#67d3e0') }] },
+          options: {
+            indexAxis: 'y',
+            scales: {
+              x: { beginAtZero:true, max:100, ticks: { callback: v => v + '%' }, grid: { color:'rgba(255,255,255,0.04)'} },
+              y: { ticks: { color:'#cfe8ff' }, grid: { display:false } }
+            },
+            plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.raw.toFixed(2)}%` } } },
+            animation: { duration: 420 }
+          }
+        });
+      } catch (err){
+        console.error('[Chart init error]', err);
+      }
+    })();
+
+    // PDF Export
+    document.getElementById('exportBtn').addEventListener('click', async ()=>{
+      announce('PDF 내보내기 중입니다. 잠시 기다려주세요.');
+      const main = document.querySelector('[role="main"]');
+      try{
+        const canvas = await html2canvas(main, {scale:2, useCORS:true});
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('sinusitis_snapshot.pdf');
+        announce('PDF 저장이 완료되었습니다.');
+      } catch(err){
+        console.error(err);
+        alert('PDF 내보내기 실패 — 개발자 콘솔을 확인하세요.');
+        announce('PDF 내보내기 실패');
+      }
+    });
+
+    setLogoSize(56);
+  </script>
+</body>
+</html>

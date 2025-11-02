@@ -1,0 +1,28 @@
+{
+  "img_size": [
+    96,
+    96
+  ],
+  "channels": 1,
+  "class_names": [
+    "Normal",
+    "Left-Mucosal",
+    "Left-Air fluid",
+    "Left-Haziness",
+    "Right-Mucosal",
+    "Right-Air fluid",
+    "Right-Haziness",
+    "Both"
+  ],
+  "normal_threshold": 0.6,
+  "alpha_vec": [
+    0.7674635052680969,
+    1.0332194566726685,
+    1.0332194566726685,
+    1.0332194566726685,
+    1.0332194566726685,
+    1.0332194566726685,
+    1.0332194566726685,
+    1.0332194566726685
+  ]
+}
