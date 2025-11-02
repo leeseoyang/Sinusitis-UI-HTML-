@@ -14,19 +14,27 @@ def _normalize(image_array: np.ndarray) -> np.ndarray:
     return image_array.astype(np.float32) / 255.0
 
 
-def preprocess_and_correct(pil_image):
+def preprocess_and_correct(pil_image, channels=1):
     """
     학습 시 사용한 파이프라인과 동일한 방식으로 전처리.
     Args:
         pil_image: PIL Image 객체
+        channels: 출력 채널 수 (1 또는 3)
     Returns:
-        tuple: (모델 입력용 numpy array(H,W,1), 표시용 PIL 이미지)
+        tuple: (모델 입력용 numpy array(H,W,C), 표시용 PIL 이미지)
     """
     gray = _to_grayscale(pil_image)
     resized = gray.resize(IMAGE_SIZE)
+    
     processed = np.array(resized, dtype=np.float32)
     processed = _normalize(processed)
-    processed = np.expand_dims(processed, axis=-1)
+    
+    if channels == 3:
+        # 그레이스케일을 RGB 3채널로 변환
+        processed = np.stack([processed, processed, processed], axis=-1)
+    else:
+        # 1채널 유지
+        processed = np.expand_dims(processed, axis=-1)
 
     corrected_pil = pil_image.copy()
     return processed, corrected_pil

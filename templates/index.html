@@ -11,72 +11,210 @@
 
   <style>
     :root{
-      --bg:#0f1115;
-      --surface:#171a21;
-      --surface-2:#1e2230;
-      --border:#273043;
-      --text:#e8eef8;
-      --muted:#a7b3c6;
-      --kyu-dark:#0b5b36;
-      --kyu-light:#8fd473;
-      --primary:var(--kyu-light);
-      --accent:var(--kyu-dark);
-      --warn:#ff9933;
-      --focus:#8ab4f8;
-      --shadow:0 10px 30px rgba(0,0,0,.35);
-      --radius:14px;
-      --gap:16px;
-      --maxw:1100px;
-      --logo-size:56px;
+      --medical-blue:#1565C0;
+      --medical-light-blue:#42A5F5;
+      --medical-green:#2E7D32;
+      --medical-light-green:#66BB6A;
+      --medical-red:#C62828;
+      --medical-orange:#FF7043;
+      --medical-gray:#37474F;
+      --medical-light-gray:#78909C;
+      --bg:#f8f9fa;
+      --surface:#ffffff;
+      --surface-2:#f1f3f4;
+      --border:#e1e5e9;
+      --text:#212529;
+      --muted:#6c757d;
+      --primary:var(--medical-blue);
+      --accent:var(--medical-green);
+      --warn:var(--medical-orange);
+      --danger:var(--medical-red);
+      --shadow:0 2px 8px rgba(0,0,0,0.08);
+      --radius:8px;
+      --gap:20px;
+      --maxw:1400px;
+      --logo-size:48px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       margin:0; background:var(--bg); color:var(--text);
-      display:flex; justify-content:center; padding:28px;
+      display:flex; justify-content:center; padding:20px;
+      line-height:1.5;
     }
     .container{ width:min(var(--maxw), 96vw); }
 
-    header{ display:flex; gap:12px; align-items:center; margin-bottom:18px; }
-    .logo-wrap{ width:var(--logo-size); height:var(--logo-size); border-radius:10px; overflow:hidden; display:flex;align-items:center;justify-content:center; background:linear-gradient(180deg,var(--kyu-dark),var(--kyu-light)); flex:0 0 auto;}
+    header{ 
+      display:flex; gap:16px; align-items:center; margin-bottom:24px; 
+      padding:20px; background:var(--surface); border-radius:var(--radius);
+      border:1px solid var(--border); box-shadow:var(--shadow);
+    }
+    .logo-wrap{ 
+      width:var(--logo-size); height:var(--logo-size); border-radius:6px; 
+      overflow:hidden; display:flex; align-items:center; justify-content:center; 
+      background:var(--primary); flex:0 0 auto;
+    }
     .logo-wrap img{ width:100%; height:100%; object-fit:contain; display:block; }
-    header h1{ margin:0; font-size: clamp(20px, 3vw, 28px); color:var(--primary); letter-spacing:.2px;}
-    header .sub{ color:var(--muted); font-size:13px; margin-top:4px;}
+    header h1{ 
+      margin:0; font-size: clamp(22px, 3vw, 28px); color:var(--text); 
+      letter-spacing:-0.02em; font-weight:700;
+    }
+    header .sub{ color:var(--muted); font-size:15px; margin-top:6px; }
 
-    .grid{ display:grid; grid-template-columns: 1.15fr 1fr; gap:22px; }
-    @media(max-width:920px){ .grid{ grid-template-columns:1fr; } }
+    .grid{ display:grid; grid-template-columns: 1fr 1fr; gap:24px; }
+    @media(max-width:1000px){ .grid{ grid-template-columns:1fr; } }
 
     .card{
-      background: linear-gradient(180deg,var(--surface),var(--surface-2));
+      background: var(--surface);
       border-radius:var(--radius);
       border:1px solid var(--border);
       box-shadow:var(--shadow);
-      padding:20px;
+      padding:24px;
     }
-    .card h2{ margin:0 0 12px; color:#cfe8ff; font-size:18px }
-    .hint { color:var(--muted); font-size:13px; margin-top:6px; }
-
-    .dropzone{
-      border:1.5px dashed rgba(255,255,255,0.04);
-      background: rgba(255,255,255,0.01);
-      border-radius:12px; padding:18px; text-align:center; cursor:pointer;
+    .card h2{ 
+      margin:0 0 20px; color:var(--text); font-size:20px; font-weight:600;
+      display:flex; align-items:center; gap:8px; letter-spacing:-0.01em;
     }
-    .dropzone:focus, .dropzone.drag{ outline:3px solid rgba(138,180,248,0.12); }
-    .title{ font-weight:700; margin-bottom:6px; color:#d8efff;}
-    .small{ color:var(--muted); font-size:13px; }
+    .hint { color:var(--muted); font-size:13px; margin-top:8px; }
 
-    .actions{ display:flex; gap:10px; margin-top:12px; align-items:center; flex-wrap:wrap }
+    /* 파일 업로드 영역 */
+    .upload-section{
+      margin-bottom:20px;
+    }
+    .upload-area{
+      text-align:center; padding:20px;
+    }
+    .upload-btn{
+      display:inline-block; padding:24px 32px; border:2px dashed var(--border);
+      background:var(--surface-2); border-radius:var(--radius); cursor:pointer;
+      transition: all 0.2s ease; min-width:300px;
+    }
+    .upload-btn:hover{
+      border-color:var(--primary); background:var(--surface);
+      box-shadow:0 2px 8px rgba(21,101,192,0.1);
+    }
+    .upload-icon{
+      font-size:32px; margin-bottom:8px;
+    }
+    .upload-text{
+      font-size:18px; font-weight:600; color:var(--text); margin-bottom:4px;
+    }
+    .upload-desc{
+      font-size:13px; color:var(--muted);
+    }
+
+    .actions{ display:flex; gap:12px; margin-top:16px; align-items:center; flex-wrap:wrap }
     .btn{
-      padding:10px 14px; border-radius:10px; border:1px solid var(--border);
-      background:#1b2331; color:var(--text); font-weight:700; cursor:pointer;
+      padding:12px 20px; border-radius:var(--radius); border:1px solid var(--border);
+      background:var(--surface); color:var(--text); font-weight:500; cursor:pointer;
+      font-size:14px; transition: all 0.2s ease; display:inline-flex; align-items:center; gap:6px;
     }
-    .btn:focus{ outline:2px solid var(--focus); outline-offset:3px; }
-    .btn--primary{ background: linear-gradient(90deg,var(--kyu-light),var(--kyu-dark)); color:#021212; border:none; }
-    .result-badge{ display:inline-flex; gap:10px; align-items:center; padding:10px 12px; border-radius:12px; background: rgba(16,33,40,0.55); border:1px solid rgba(36,74,87,0.3); margin-top:10px; font-weight:700; }
-    .result-badge .label{ color:#9ad7e5;} .result-badge .pred{ color:var(--kyu-light); } .result-badge .conf{ color:var(--warn); }
+    .btn:hover{ background:var(--surface-2); border-color:var(--primary); }
+    .btn:focus{ outline:none; box-shadow:0 0 0 3px rgba(21,101,192,0.1); }
+    .btn--primary{ 
+      background: var(--primary); color:#ffffff; border-color:var(--primary); 
+    }
+    .btn--primary:hover{ background:var(--medical-light-blue); }
+    /* 의료진 친화적 결과 표시 */
+    .prediction-result{
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      padding:20px; margin-top:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04);
+    }
+    .prediction-header{ 
+      display:flex; align-items:center; gap:10px; margin-bottom:16px;
+      padding-bottom:12px; border-bottom:1px solid var(--border);
+    }
+    .prediction-header h3{ 
+      margin:0; color:var(--text); font-weight:600; font-size:16px;
+    }
+    
+    .prediction-summary{
+      display:flex; justify-content:space-between; align-items:center; 
+      margin-bottom:12px; padding:12px; background:var(--surface-2); border-radius:6px;
+    }
+    .prediction-label{
+      color:var(--text); font-size:18px; font-weight:600;
+    }
+    .prediction-confidence{
+      color:var(--medical-success); font-size:16px; font-weight:600;
+    }
+    
+    .confidence-bar{
+      height:12px; background:var(--border); border-radius:6px; overflow:hidden; margin-bottom:8px;
+    }
+    .confidence-fill{
+      height:100%; background:var(--medical-success); border-radius:6px;
+      transition: width 0.5s ease-in-out;
+    }
+    
+    .prediction-details{
+      font-size:13px; color:var(--muted); display:flex; justify-content:space-between;
+      align-items:center;
+    }
+    
+    /* 차트 영역 개선 */
+    .chart-card{
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px; margin-top:16px;
+    }
+    
+    /* ROI 영역 개선 */
+    .roi-section{
+      margin-top:20px; background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:16px;
+    }
+    .roi-header{
+      display:flex; align-items:center; gap:8px; margin-bottom:12px;
+      color:var(--text); font-weight:600; font-size:14px;
+    }
+    .roi-scores{
+      margin-top:12px; padding:12px; background:var(--surface-2); border-radius:6px;
+      display:flex; justify-content:space-between; font-size:13px;
+    }
+    .roi-score{
+      color:var(--medical-success); font-weight:600;
+    }
     .media img{ width:100%; height:auto; border-radius:12px; border:1px solid var(--border); object-fit:contain; background:#0c0f14; max-height:420px; }
-    .chart-card{ padding:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent); border-radius:10px; border:1px solid rgba(255,255,255,0.02); }
+    .model-selector{
+      margin-top:20px; padding:20px; 
+      background: var(--surface-2);
+      border-radius:var(--radius); border:1px solid var(--border);
+    }
+    .model-selector h3{
+      margin:0 0 16px; color:var(--text); font-size:16px; font-weight:600;
+    }
+    .model-option{
+      display:flex; align-items:flex-start; gap:12px; padding:16px; 
+      background:var(--surface); border-radius:8px; margin-bottom:12px;
+      border:1px solid var(--border); cursor:pointer; transition:all 0.2s ease;
+    }
+    .model-option:hover{ border-color:var(--primary); background:var(--surface); }
+    .model-option:has(input:checked){ border-color:var(--primary); background:var(--surface); }
+    .model-option input[type="radio"]{ margin:4px 0 0 0; }
+    .model-details{ flex:1; }
+    .model-name{ color:var(--text); font-weight:600; margin-bottom:4px; font-size:15px; }
+    .model-desc{ color:var(--muted); font-size:13px; line-height:1.4; margin-bottom:6px; }
+    .model-classes{ color:var(--primary); font-size:12px; font-weight:500; }
+    
+    .prediction-result{
+      margin-top:16px; padding:16px;
+      background: linear-gradient(135deg, rgba(138,180,248,0.1), rgba(11,91,54,0.05));
+      border-radius:12px; border:1px solid rgba(138,180,248,0.2);
+    }
+    .prediction-header{
+      display:flex; align-items:center; gap:8px; margin-bottom:12px;
+    }
+    .prediction-header h3{
+      margin:0; color:#8ab4f8; font-size:16px; font-weight:600;
+    }
+    .confidence-bar{
+      background:rgba(255,255,255,0.1); height:6px; border-radius:3px; overflow:hidden; margin-top:8px;
+    }
+    .confidence-fill{
+      height:100%; background:linear-gradient(90deg,var(--kyu-light),var(--warn)); border-radius:3px;
+      transition: width 0.5s ease;
+    }
     .sr-only{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
     @keyframes fadeInUp { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
     .card, img, canvas, .result-badge{ animation: fadeInUp .28s ease both; }
@@ -90,17 +228,17 @@
         <div id="logoText" style="display:none;color:#fff;font-weight:800">KONYANG</div>
       </div>
       <div>
-        <h1>부비동염 판별기</h1>
-        <div class="sub">X-ray 이미지를 업로드하면 결과를 제공합니다.</div>
+        <h1>부비동염 AI 진단 시스템</h1>
+        <div class="sub">X-ray 영상을 분석하여 정확한 부비동 상태를 진단합니다</div>
       </div>
 
       <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
         <div role="group" aria-label="로고 크기 제어" style="display:flex; gap:6px;">
-          <button class="btn" id="logoSmallBtn" title="작게" aria-pressed="false">작게</button>
-          <button class="btn btn--primary" id="logoMidBtn" title="중간" aria-pressed="true">중간</button>
-          <button class="btn" id="logoLargeBtn" title="크게" aria-pressed="false">크게</button>
+          <button class="btn" id="logoSmallBtn" title="작게" aria-pressed="false">S</button>
+          <button class="btn btn--primary" id="logoMidBtn" title="중간" aria-pressed="true">M</button>
+          <button class="btn" id="logoLargeBtn" title="크게" aria-pressed="false">L</button>
         </div>
-        <button class="btn" id="changeLogoBtn" title="로고 교체">로고 교체</button>
+        <button class="btn" id="changeLogoBtn" title="로고 교체">로고 변경</button>
         <input id="logoUpload" type="file" accept=".svg,/Sinusitis-UI-HTML--1/static/logo.png, class="sr-only" />
       </div>
     </header>
@@ -108,66 +246,111 @@
     <div class="grid">
       <!-- LEFT: upload & preview -->
       <section class="card" aria-labelledby="uploadTitle">
-        <h2 id="uploadTitle">1) 이미지 업로드</h2>
+        <h2 id="uploadTitle">의료 영상 분석 시스템</h2>
 
         <!-- ✅ 서버 제출용 폼 -->
         <form id="predictForm" action="/predict" method="post" enctype="multipart/form-data">
-          <label class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="이미지 업로드 영역">
-            <div class="title">이미지를 드래그 & 드롭 또는 클릭하여 선택</div>
-            <div class="small">지원: JPG / PNG · 최대 1장 · 개인정보 주의</div>
-            <!-- ✅ 여기! name을 image로 (백엔드: request.files['image']) -->
-            <input id="fileInput" type="file" name="image" accept="image/*" style="display:none" required />
-          </label>
+          <div class="upload-section">
+            <div class="upload-area">
+              <input id="fileInput" type="file" name="image" accept="image/*" style="display:none" required />
+              <button type="button" class="upload-btn" id="chooseBtn">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">파일 선택</div>
+                <div class="upload-desc">DICOM, JPG, PNG 지원 | 최대 10MB</div>
+              </button>
+            </div>
+          </div>
 
-          <div class="actions" style="margin-top:12px">
-            <button type="button" class="btn" id="chooseBtn">파일 선택</button>
-            <button type="submit" class="btn btn--primary" id="predictBtn" disabled>예측하기</button>
-            <button type="button" class="btn" id="exportBtn">PDF 내보내기</button>
-            <span id="statusText" class="small" aria-live="polite" role="status">준비</span>
+          <!-- 모델 선택 UI 개선 -->
+          <div class="model-selector">
+            <h3>진단 모델 선택</h3>
+            
+            <label class="model-option">
+              <input type="radio" name="model_type" value="8class" {% if model_type != '4class' %}checked{% endif %}>
+              <div class="model-details">
+                <div class="model-name">정밀 진단 모델</div>
+                <div class="model-desc">좌우측 부비동의 세부 병변 상태를 정확히 분류</div>
+                <div class="model-classes">정상, 좌측/우측 점막 비후, 좌측/우측 액체 저류, 좌측/우측 혼탁, 양측성</div>
+              </div>
+            </label>
+            
+            <label class="model-option">
+              <input type="radio" name="model_type" value="4class" {% if model_type == '4class' %}checked{% endif %}>
+              <div class="model-details">
+                <div class="model-name">빠른 진단 모델</div>
+                <div class="model-desc">부비동염의 위치별 간단 분류로 신속한 진단 지원</div>
+                <div class="model-classes">정상, 좌측 부비동염, 우측 부비동염, 양측성 부비동염</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="actions" style="margin-top:16px">
+            <button type="submit" class="btn btn--primary" id="predictBtn" disabled>AI 진단 시작</button>
+            <button type="button" class="btn" id="exportBtn">결과 저장</button>
+            <span id="statusText" class="small" aria-live="polite" role="status" style="margin-left:auto;">파일을 선택해주세요</span>
           </div>
         </form>
 
         {% if prediction %}
-        <div class="result-badge" role="status" aria-live="polite">
-          <span class="label">예측 결과:</span>
-          <span class="pred">&nbsp;{{ prediction }}&nbsp;</span>
-          <span class="label">신뢰도:</span>
-          <span class="conf">&nbsp;{{ confidence | round(2) }}%</span>
+        <div class="prediction-result" role="status" aria-live="polite">
+          <div class="prediction-header">
+            <h3>진단 결과</h3>
+          </div>
+          
+          <div class="prediction-summary">
+            <div class="prediction-label">{{ prediction }}</div>
+            <div class="prediction-confidence">{{ confidence | round(1) }}%</div>
+          </div>
+          
+          <div class="confidence-bar">
+            <div class="confidence-fill" data-confidence="{{ confidence }}"></div>
+          </div>
+          
+          <div class="prediction-details">
+            <span>신뢰도: {{ confidence | round(2) }}%</span>
+            <span>{% if model_type == '8class' %}정밀 진단{% else %}빠른 진단{% endif %}</span>
+          </div>
         </div>
         {% endif %}
-        <div class="actions" style="margin-top:10px">
-          <button type="button" class="btn" id="resetBtn">다시 예측하기</button>
+
+        <div class="actions" style="margin-top:12px">
+          <button type="button" class="btn" id="resetBtn">새 이미지 분석</button>
         </div>
 
-        <div id="previewWrap" style="margin-top:14px; display:none">
-          <h3 style="margin:6px 0 8px; color:#cfe8ff">입력 이미지 (미리보기)</h3>
+        <div id="previewWrap" style="margin-top:20px; display:none">
+          <h3 style="margin:8px 0 12px; color:var(--text); font-weight:600;">업로드된 이미지</h3>
           <div class="media"><img id="previewImg" alt="업로드 미리보기" /></div>
         </div>
 
         {% if image_data %}
-        <div style="margin-top:14px">
-          <h3 style="margin:6px 0 8px; color:#cfe8ff">입력 이미지</h3>
+        <div style="margin-top:20px">
+          <h3 style="margin:8px 0 12px; color:var(--text); font-weight:600;">분석 대상 영상</h3>
           <div class="media"><img src="data:image/png;base64,{{ image_data }}" alt="업로드된 X-ray 이미지" /></div>
         </div>
         {% endif %}
-      </section>
+      </div></section>
 
-      <!-- RIGHT: charts & grad-cam -->
+      <!-- RIGHT: charts & visualization -->
       <aside class="card" aria-labelledby="visualTitle">
-        <h2 id="visualTitle">2) 예측 분포 & 시각화</h2>
+        <h2 id="visualTitle">분석 결과 시각화</h2>
 
         <div class="chart-card" style="margin-top:10px">
-          <canvas id="barChart" aria-label="클래스별 예측 확률 막대 차트" role="img" height="160"></canvas>
+          <canvas id="barChart" aria-label="각 클래스별 예측 확률 분포" role="img" height="160"></canvas>
         </div>
 
         {% if boxed_image_data %}
-        <div style="margin-top:12px">
-          <h3 style="margin:8px 0 8px; color:#cfe8ff">자동 추적 결과 (박스)</h3>
+        <div class="roi-section">
+          <div class="roi-header">
+            <span>부비동 영역 감지 (ROI)</span>
+          </div>
           <div class="media">
-            <img src="data:image/png;base64,{{ boxed_image_data }}" alt="상악동 박스 자동 추적 결과" />
+            <img src="data:image/png;base64,{{ boxed_image_data }}" alt="부비동 영역이 표시된 X-ray 이미지" />
           </div>
           {% if left_score is defined and right_score is defined %}
-          <p class="hint" style="margin-top:8px">좌측: {{ (left_score * 100) | round(1) }}% · 우측: {{ (right_score * 100) | round(1) }}%</p>
+          <div class="roi-scores">
+            <span class="roi-score">좌측 영역: {{ (left_score * 100) | round(1) }}%</span>
+            <span class="roi-score">우측 영역: {{ (right_score * 100) | round(1) }}%</span>
+          </div>
           {% endif %}
         </div>
         {% endif %}
@@ -178,6 +361,17 @@
   <div id="srStatus" class="sr-only" role="status" aria-live="polite"></div>
 
   <script>
+    // Confidence bar 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+      const confidenceFill = document.querySelector('.confidence-fill');
+      if (confidenceFill) {
+        const confidence = confidenceFill.getAttribute('data-confidence');
+        if (confidence) {
+          confidenceFill.style.width = confidence + '%';
+        }
+      }
+    });
+
     // 다시 예측하기 버튼 동작 (이벤트 위임)
     const resetBtn = document.getElementById('resetBtn');
     if (resetBtn) {
@@ -230,9 +424,8 @@
       announce('로고가 교체되었습니다');
     });
 
-    // Drag & Drop + Preview + Submit enable
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('fileInput');  // name="image"
+    // 파일 선택 및 미리보기
+    const fileInput = document.getElementById('fileInput');
     const chooseBtn = document.getElementById('chooseBtn');
     const predictBtn = document.getElementById('predictBtn');
     const previewWrap = document.getElementById('previewWrap');
@@ -240,38 +433,39 @@
     const statusText = document.getElementById('statusText');
 
     function enableSubmitIfFile(){
-      predictBtn.disabled = !(fileInput.files && fileInput.files.length > 0);
+      const hasFile = fileInput.files && fileInput.files.length > 0;
+      predictBtn.disabled = !hasFile;
+      if (hasFile) {
+        statusText.textContent = '✅ 파일 선택 완료! AI 진단을 시작하세요';
+      } else {
+        statusText.textContent = '파일을 선택해주세요';
+      }
     }
 
-    chooseBtn.addEventListener('click', ()=> fileInput.click());
-    dropzone.addEventListener('click', ()=> fileInput.click());
-    dropzone.addEventListener('dragover', (e)=> { e.preventDefault(); dropzone.classList.add('drag'); });
-    dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag'));
-    dropzone.addEventListener('drop', (e)=> {
-      e.preventDefault(); dropzone.classList.remove('drag');
-      if(e.dataTransfer.files && e.dataTransfer.files[0]) {
-        // 드롭한 파일을 input에 세팅
-        const dt = new DataTransfer();
-        for(const f of e.dataTransfer.files) dt.items.add(f);
-        fileInput.files = dt.files;
-        handlePreview(fileInput.files[0]);
-      }
+    // 파일 선택 버튼 클릭 이벤트
+    chooseBtn.addEventListener('click', () => {
+      fileInput.click();
     });
-    dropzone.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
 
-    fileInput.addEventListener('change', (e)=> {
-      if(e.target.files && e.target.files[0]) handlePreview(e.target.files[0]);
+    // 파일 선택 변경 이벤트
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handlePreview(e.target.files[0]);
+      }
     });
 
     function handlePreview(file){
-      statusText.textContent = '이미지 로드 중...';
+      statusText.textContent = '📤 이미지 처리 중...';
       const reader = new FileReader();
-      reader.onload = ()=>{
+      reader.onload = () => {
         previewImg.src = reader.result;
         previewWrap.style.display = 'block';
-        statusText.textContent = '이미지 준비 완료';
-        enableSubmitIfFile();              // ✅ 파일 선택 시 제출 가능
-        announce('이미지 준비 완료');
+        statusText.textContent = '✅ 파일 선택 완료! AI 진단을 시작하세요';
+        enableSubmitIfFile();
+        announce('이미지 업로드가 완료되었습니다');
+      };
+      reader.onerror = () => {
+        statusText.textContent = '❌ 파일 읽기 오류. 다른 파일을 선택해주세요';
       };
       reader.readAsDataURL(file);
     }
@@ -282,14 +476,14 @@
       if(!canvas) return;
 
       try {
-        const labels = JSON.parse('{{ class_names|tojson|safe if class_names is defined else "[]" }}');
+        const labels = JSON.parse('{{ selected_class_names|tojson|safe if selected_class_names is defined else class_names_8|tojson|safe if class_names_8 is defined else "[]" }}');
         const raw = JSON.parse('{{ (probs|tojson|safe if probs is defined else "[]") }}');
 
         if(!Array.isArray(labels) || !Array.isArray(raw) || labels.length === 0 || raw.length === 0){
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#a7b3c6';
           ctx.font = '14px system-ui';
-          ctx.fillText('예측 후 결과가 여기에 표시됩니다.', 12, 22);
+          ctx.fillText('🔍 AI 분석 후 결과가 여기에 표시됩니다', 12, 22);
           return;
         }
 
