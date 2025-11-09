@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>부비동염 AI 진단 시스템 — 통합 진료 플랫폼</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root {
+      --medical-blue: #1565C0; --medical-light-blue: #42A5F5;
+      --medical-green: #2E7D32; --medical-light-green: #66BB6A;
+      --medical-red: #C62828; --medical-orange: #FF7043;
+      --medical-gray: #37474F; --medical-light-gray: #78909C;
+      --medical-teal: #00796B; --medical-purple: #7B1FA2;
+      --bg: #f8f9fa; --surface: #ffffff; --surface-2: #f1f3f4;
+      --border: #e1e5e9; --text: #212529; --muted: #6c757d;
+      --primary: var(--medical-blue); --accent: var(--medical-green);
+      --warn: var(--medical-orange); --danger: var(--medical-red);
+      --shadow: 0 2px 8px rgba(0,0,0,0.08); --radius: 12px; --gap: 20px;
+      --maxw: 1600px; --logo-size: 48px;
+    }
+    
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.6;
+    }
+
+    /* 상단 헤더 */
+    .top-header {
+      background: linear-gradient(135deg, var(--medical-blue), var(--medical-teal));
+      color: white; padding: 16px 24px; box-shadow: var(--shadow);
+    }
+    .header-content {
+      max-width: var(--maxw); margin: 0 auto;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .logo-section {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo-wrap {
+      width: var(--logo-size); height: var(--logo-size);
+      background: rgba(255,255,255,0.2); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    .hospital-info h1 {
+      margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
+    }
+    .hospital-info .sub {
+      font-size: 14px; opacity: 0.9; margin-top: 2px;
+    }
+    .user-info {
+      margin-left: auto; display: flex; align-items: center; gap: 16px;
+    }
+    .user-badge {
+      background: rgba(255,255,255,0.15); padding: 8px 16px;
+      border-radius: 20px; font-size: 14px; font-weight: 600;
+    }
+
+    /* 모드 선택 탭 */
+    .mode-tabs {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 24px; display: flex; align-items: center; gap: 4px;
+    }
+    .mode-tab {
+      padding: 12px 24px; border: none; background: none;
+      color: var(--muted); font-weight: 600; cursor: pointer;
+      border-bottom: 3px solid transparent; transition: all 0.2s ease;
+      font-size: 15px;
+    }
+    .mode-tab.active {
+      color: var(--primary); border-bottom-color: var(--primary);
+    }
+    .mode-tab:hover:not(.active) {
+      color: var(--text); background: var(--surface-2);
+    }
+
+    /* 메인 컨테이너 */
+    .main-container {
+      max-width: var(--maxw); margin: 0 auto; padding: 24px;
+      min-height: calc(100vh - 160px);
+    }
+
+    /* 진단 탭 네비게이션 */
+    .diagnosis-tabs {
+      display: flex; gap: 4px; margin-bottom: 24px;
+      background: var(--surface-2); padding: 4px; border-radius: 12px;
+    }
+    .diagnosis-tab {
+      flex: 1; padding: 12px 20px; border: none; background: none;
+      color: var(--muted); font-weight: 600; cursor: pointer;
+      border-radius: 8px; transition: all 0.2s ease; text-align: center;
+    }
+    .diagnosis-tab.active {
+      background: var(--surface); color: var(--primary);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* 페이지 레이아웃 */
+    .page-content { display: none; }
+    .page-content.active { display: block; }
+
+    /* 의료진 화면 그리드 */
+    .medical-grid {
+      display: grid; grid-template-columns: 320px 1fr 1fr;
+      gap: var(--gap); align-items: start;
+    }
+    @media (max-width: 1200px) {
+      .medical-grid { grid-template-columns: 300px 1fr; }
+      .medical-results { grid-column: 1 / -1; }
+    }
+    @media (max-width: 768px) {
+      .medical-grid { grid-template-columns: 1fr; }
+    }
+
+    /* 환자 화면 레이아웃 */
+    .patient-layout {
+      max-width: 800px; margin: 0 auto; text-align: center;
+    }
+    .patient-card {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 40px; box-shadow: var(--shadow); margin-bottom: 24px;
+    }
+
+    /* 공통 카드 스타일 */
+    .card {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); box-shadow: var(--shadow); padding: 20px;
+    }
+    .card h2 {
+      margin: 0 0 16px; font-size: 18px; font-weight: 700;
+      color: var(--text); display: flex; align-items: center; gap: 8px;
+    }
+
+    /* 파일 업로드 */
+    .upload-area {
+      text-align: center; padding: 32px;
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      background: var(--surface-2); cursor: pointer; transition: all 0.2s ease;
+    }
+    .upload-area:hover {
+      border-color: var(--primary); background: var(--surface);
+    }
+    .upload-icon { font-size: 48px; margin-bottom: 16px; }
+    .upload-text { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .upload-desc { color: var(--muted); font-size: 14px; }
+
+    /* 버튼 스타일 */
+    .btn {
+      padding: 12px 24px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-weight: 600;
+      cursor: pointer; transition: all 0.2s ease; display: inline-flex;
+      align-items: center; gap: 8px; font-size: 14px;
+    }
+    .btn:hover { background: var(--surface-2); border-color: var(--primary); }
+    .btn--primary {
+      background: var(--primary); color: white; border-color: var(--primary);
+    }
+    .btn--primary:hover { background: var(--medical-light-blue); }
+    .btn--success {
+      background: var(--accent); color: white; border-color: var(--accent);
+    }
+
+    /* 진단 결과 */
+    .diagnosis-result {
+      background: linear-gradient(135deg, rgba(21,101,192,0.1), rgba(46,125,50,0.05));
+      border: 1px solid rgba(21,101,192,0.2); border-radius: var(--radius);
+      padding: 24px; margin: 20px 0;
+    }
+    .result-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .result-title { font-size: 20px; font-weight: 700; color: var(--primary); }
+    .confidence-badge {
+      background: var(--accent); color: white; padding: 6px 12px;
+      border-radius: 20px; font-size: 14px; font-weight: 600;
+    }
+
+    /* 차트 스타일 */
+    .chart-container {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-top: 16px;
+    }
+
+    /* ROI 이미지 */
+    .image-viewer {
+      background: #000; border-radius: var(--radius); padding: 16px;
+      text-align: center; margin: 16px 0;
+    }
+    .image-viewer img {
+      max-width: 100%; height: auto; border-radius: 8px;
+    }
+
+    /* 근거 분석 */
+    .evidence-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      margin-top: 20px;
+    }
+    .evidence-item {
+      background: var(--surface-2); border-radius: 8px; padding: 16px;
+    }
+    .evidence-item h4 {
+      margin: 0 0 8px; color: var(--primary); font-size: 14px; font-weight: 600;
+    }
+    .evidence-value {
+      font-size: 18px; font-weight: 700; color: var(--text);
+    }
+    .evidence-desc {
+      font-size: 12px; color: var(--muted); margin-top: 4px;
+    }
+
+    /* 의료진 판독 */
+    .reading-section {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); padding: 20px;
+    }
+    .reading-textarea {
+      width: 100%; min-height: 200px; padding: 16px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-family: inherit; line-height: 1.6; resize: vertical;
+    }
+    .reading-actions {
+      display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end;
+    }
+
+    /* 환자용 간소화 스타일 */
+    .patient-result {
+      text-align: center; padding: 32px;
+    }
+    .patient-diagnosis {
+      font-size: 32px; font-weight: 800; color: var(--primary);
+      margin: 16px 0;
+    }
+    .patient-confidence {
+      font-size: 18px; color: var(--accent); margin-bottom: 24px;
+    }
+    .patient-explanation {
+      background: var(--surface-2); border-radius: 12px; padding: 24px;
+      text-align: left; line-height: 1.8;
+    }
+
+    /* 유틸리티 */
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mb-0 { margin-bottom: 0; }
+    .mt-20 { margin-top: 20px; }
+    .flex { display: flex; }
+    .flex-between { justify-content: space-between; }
+    .flex-center { align-items: center; }
+    .gap-12 { gap: 12px; }
+    
+    /* 신뢰도 바 */
+    .confidence-bar-fill {
+      height: 100%; background: var(--accent); width: 0%;
+      transition: width 0.5s ease; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <!-- 상단 헤더 -->
+  <header class="top-header">
+    <div class="header-content">
+      <div class="logo-section">
+        <div class="logo-wrap">
+          <img id="hospitalLogo" src="logo.png" alt="병원 로고" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+          <div style="display:none; color:white; font-weight:800; font-size:14px;">KY</div>
+        </div>
+        <div class="hospital-info">
+          <h1>건양대학교병원 부비동염 AI 진단센터</h1>
+          <div class="sub">X-ray 영상 기반 정밀 진단 시스템</div>
+        </div>
+      </div>
+      <div class="user-info">
+        <div class="user-badge">👨‍⚕️ 의료진 모드</div>
+        <button class="btn" style="background: rgba(255,255,255,0.2); border: none; color: white;" onclick="logout()">
+          로그아웃
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 모드 선택 탭 -->
+  <nav class="mode-tabs">
+    <button class="mode-tab active" onclick="switchMode('medical')">의료진 화면</button>
+    <button class="mode-tab" onclick="switchMode('patient')">환자용 화면</button>
+  </nav>
+
+  <!-- 메인 컨테이너 -->
+  <main class="main-container">
+    <!-- 의료진 화면 -->
+    <div id="medical-mode" class="page-content active">
+      <!-- 진단 탭 -->
+      <nav class="diagnosis-tabs">
+        <button class="diagnosis-tab active" onclick="switchTab('ai-diagnosis')">🤖 AI 진단</button>
+        <button class="diagnosis-tab" onclick="switchTab('evidence')">📊 근거 분석</button>
+        <button class="diagnosis-tab" onclick="switchTab('reading')">📝 의료진 판독</button>
+      </nav>
+
+      <!-- AI 진단 탭 -->
+      <div id="ai-diagnosis" class="tab-content active">
+        <div class="medical-grid">
+          <!-- 좌측: 업로드 & 제어 -->
+          <section class="card">
+            <h2>🏥 영상 업로드</h2>
+            <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data">
+              <input type="file" id="fileInput" name="image" accept="image/*" style="display:none" required>
+              
+              <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">클릭하여 파일 선택</div>
+                <div class="upload-desc">DICOM, JPG, PNG 지원 (최대 10MB)</div>
+              </div>
+
+              <div style="margin: 20px 0;">
+                <h3 style="margin: 0 0 12px; font-size: 16px;">진단 모델 선택</h3>
+                <label style="display: flex; gap: 12px; align-items: center; margin: 8px 0; cursor: pointer;">
+                  <input type="radio" name="model_type" value="8class" checked>
+                  <div>
+                    <div style="font-weight: 600;">정밀 진단 모델</div>
+                    <div style="font-size: 13px; color: var(--muted);">8클래스 세부 분류</div>
+                  </div>
+                </label>
+                <label style="display: flex; gap: 12px; align-items: center; margin: 8px 0; cursor: pointer;">
+                  <input type="radio" name="model_type" value="4class">
+                  <div>
+                    <div style="font-weight: 600;">빠른 진단 모델</div>
+                    <div style="font-size: 13px; color: var(--muted);">4클래스 간단 분류</div>
+                  </div>
+                </label>
+              </div>
+
+              <div class="flex gap-12" style="margin-top: 20px;">
+                <button type="submit" class="btn btn--primary" disabled id="analyzeBtn">
+                  🔍 AI 분석 시작
+                </button>
+                <button type="button" class="btn" onclick="resetForm()">🔄 초기화</button>
+              </div>
+            </form>
+
+            <div id="uploadStatus" style="margin-top: 16px; padding: 12px; background: var(--surface-2); border-radius: 8px; display: none;">
+              <div id="statusText">파일을 선택해주세요</div>
+            </div>
+          </section>
+
+          <!-- 중앙: 이미지 미리보기 -->
+          <section class="card">
+            <h2>📸 영상 미리보기</h2>
+            <div id="imagePreview" class="image-viewer" style="min-height: 300px; display: flex; align-items: center; justify-content: center;">
+              <div style="color: #666;">이미지를 업로드하면 여기에 표시됩니다</div>
+            </div>
+
+            {% if image_data %}
+            <div class="mt-20">
+              <h3 style="margin: 0 0 12px;">분석 대상 영상</h3>
+              <div class="image-viewer">
+                <img src="data:image/png;base64,{{ image_data }}" alt="분석 대상">
+              </div>
+            </div>
+            {% endif %}
+
+            {% if boxed_image_data %}
+            <div class="mt-20">
+              <h3 style="margin: 0 0 12px;">ROI 감지 결과</h3>
+              <div class="image-viewer">
+                <img src="data:image/png;base64,{{ boxed_image_data }}" alt="ROI 감지">
+              </div>
+            </div>
+            {% endif %}
+          </section>
+
+          <!-- 우측: AI 진단 결과 -->
+          <section class="card medical-results">
+            <h2>🎯 AI 진단 결과</h2>
+            {% if prediction %}
+            <div class="diagnosis-result">
+              <div class="result-header">
+                <div class="result-title">{{ prediction }}</div>
+                <div class="confidence-badge">{{ confidence | round(1) }}%</div>
+              </div>
+              
+              <div style="margin: 16px 0;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span>신뢰도</span>
+                  <span style="font-weight: 600;">{{ confidence | round(1) }}%</span>
+                </div>
+                <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+                  <div class="confidence-bar-fill" data-width="{{ confidence }}"></div>
+                </div>
+              </div>
+
+              <div style="font-size: 13px; color: var(--muted);">
+                사용 모델: {% if model_type == '8class' %}정밀 진단{% else %}빠른 진단{% endif %}
+              </div>
+            </div>
+
+            <div class="chart-container">
+              <h3 style="margin: 0 0 16px; font-size: 16px;">클래스별 확률 분포</h3>
+              <canvas id="probabilityChart" height="200"></canvas>
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: var(--muted);">
+              <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+              <div>AI 분석을 시작하려면 이미지를 업로드하고<br>분석 버튼을 클릭하세요</div>
+            </div>
+            {% endif %}
+          </section>
+        </div>
+      </div>
+
+      <!-- 근거 분석 탭 -->
+      <div id="evidence" class="tab-content">
+        <div class="card">
+          <h2>📊 AI 진단 근거 분석</h2>
+          
+          {% if prediction %}
+          <div class="evidence-grid">
+            <div class="evidence-item">
+              <h4>신뢰도 점수</h4>
+              <div class="evidence-value">{{ confidence | round(2) }}%</div>
+              <div class="evidence-desc">모델의 예측 확신도</div>
+            </div>
+            
+            <div class="evidence-item">
+              <h4>사용 모델</h4>
+              <div class="evidence-value">{% if model_type == '8class' %}8-Class{% else %}4-Class{% endif %}</div>
+              <div class="evidence-desc">{% if model_type == '8class' %}정밀 진단 모델{% else %}빠른 진단 모델{% endif %}</div>
+            </div>
+            
+            <div class="evidence-item">
+              <h4>영상 품질</h4>
+              <div class="evidence-value" id="imageQuality">분석 중...</div>
+              <div class="evidence-desc">업로드된 영상의 품질 점수</div>
+            </div>
+            
+            <div class="evidence-item">
+              <h4>ROI 감지</h4>
+              <div class="evidence-value" id="roiDetection">{% if boxed_image_data %}감지됨{% else %}대기 중{% endif %}</div>
+              <div class="evidence-desc">부비동 영역 자동 감지 상태</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 32px;">
+            <h3>상세 분석 리포트</h3>
+            <div style="background: var(--surface-2); border-radius: 8px; padding: 20px;">
+              <p><strong>분석 과정:</strong></p>
+              <ol style="line-height: 1.8;">
+                <li>업로드된 X-ray 영상에서 부비동 영역을 자동으로 감지</li>
+                <li>{% if model_type == '8class' %}8클래스 정밀 모델{% else %}4클래스 빠른 모델{% endif %}을 사용하여 병변 분류</li>
+                <li>각 클래스별 확률을 계산하고 최고 확률 클래스를 최종 진단으로 선정</li>
+                <li>신뢰도 {{ confidence | round(1) }}%로 <strong>{{ prediction }}</strong> 진단</li>
+              </ol>
+              
+              <div style="margin-top: 20px; padding: 16px; background: rgba(21,101,192,0.1); border-radius: 8px;">
+                <strong>⚠️ 중요 안내:</strong><br>
+                본 AI 진단 결과는 의료진의 최종 판단을 보조하는 참고 자료입니다.<br>
+                실제 진료 및 치료 계획은 전문의의 종합적 판단을 따라야 합니다.
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div style="text-align: center; padding: 40px; color: var(--muted);">
+            <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+            <div>AI 분석 완료 후 근거 데이터가 표시됩니다</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- 의료진 판독 탭 -->
+      <div id="reading" class="tab-content">
+        <div class="card">
+          <h2>📝 의료진 최종 판독</h2>
+          
+          <div class="reading-section">
+            <h3 style="margin: 0 0 16px;">AI 진단 요약</h3>
+            {% if prediction %}
+            <div style="background: var(--surface-2); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span><strong>AI 진단:</strong> {{ prediction }}</span>
+                <span style="color: var(--accent); font-weight: 600;">{{ confidence | round(1) }}%</span>
+              </div>
+              <div style="font-size: 13px; color: var(--muted); margin-top: 8px;">
+                모델: {% if model_type == '8class' %}정밀 진단 (8-Class){% else %}빠른 진단 (4-Class){% endif %}
+              </div>
+            </div>
+            {% endif %}
+
+            <h3 style="margin: 24px 0 16px;">의료진 판독 소견</h3>
+            <textarea class="reading-textarea" placeholder="AI 진단 결과를 참고하여 최종 판독 소견을 작성해주세요.
+
+포함 내용:
+1. 영상 소견 기술
+2. AI 진단 결과에 대한 의견
+3. 추가 검사 필요성
+4. 치료 방향 제시
+5. 환자 상담 내용"></textarea>
+
+            <div class="reading-actions">
+              <button class="btn">임시 저장</button>
+              <button class="btn btn--success">판독 완료</button>
+              <button class="btn btn--primary">환자에게 전달</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 환자 화면 -->
+    <div id="patient-mode" class="page-content">
+      <div class="patient-layout">
+        <div class="patient-card">
+          <h1 style="margin: 0 0 24px; color: var(--primary);">부비동염 검사 결과</h1>
+          
+          {% if prediction %}
+          <div class="patient-result">
+            <div style="font-size: 18px; color: var(--muted); margin-bottom: 12px;">진단 결과</div>
+            <div class="patient-diagnosis">{{ prediction }}</div>
+            <div class="patient-confidence">신뢰도: {{ confidence | round(1) }}%</div>
+            
+            <div class="patient-explanation">
+              <h3 style="color: var(--primary); margin-top: 0;">검사 결과 설명</h3>
+              {% if 'Normal' in prediction or '정상' in prediction %}
+              <p>🎉 <strong>좋은 소식입니다!</strong> 촬영된 X-ray 영상에서 부비동염의 뚜렷한 소견이 관찰되지 않았습니다.</p>
+              <p>현재 부비동 상태가 정상 범위에 있는 것으로 판단됩니다. 하지만 증상이 지속되는 경우 담당 의료진과 상담하시기 바랍니다.</p>
+              {% elif 'Left' in prediction or '좌측' in prediction %}
+              <p>📍 좌측 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
+              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+              {% elif 'Right' in prediction or '우측' in prediction %}
+              <p>📍 우측 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
+              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+              {% elif 'Both' in prediction or '양측' in prediction %}
+              <p>📍 양쪽 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
+              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+              {% else %}
+              <p>촬영된 영상을 AI가 분석한 결과입니다.</p>
+              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+              {% endif %}
+              
+              <div style="margin-top: 24px; padding: 16px; background: rgba(21,101,192,0.1); border-radius: 8px;">
+                <strong>💡 참고사항</strong><br>
+                • 본 결과는 AI 보조 진단 결과입니다<br>
+                • 최종 진단은 의료진과의 상담을 통해 결정됩니다<br>
+                • 궁금한 점은 담당 의료진에게 문의해주세요
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div style="padding: 40px; color: var(--muted);">
+            <div style="font-size: 64px; margin-bottom: 24px;">🏥</div>
+            <h2>검사 결과를 기다리고 있습니다</h2>
+            <p>X-ray 촬영이 완료되었습니다.<br>AI 분석 및 의료진 판독이 진행 중이니 잠시만 기다려주세요.</p>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if prediction %}
+        <div class="patient-card">
+          <h2 style="margin-top: 0;">다음 단계</h2>
+          <div style="text-align: left;">
+            <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
+              <div style="width: 32px; height: 32px; background: var(--accent); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;">1</div>
+              <span>담당 의료진과 결과 상담</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
+              <div style="width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;">2</div>
+              <span>필요시 추가 검사 진행</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
+              <div style="width: 32px; height: 32px; background: var(--medical-orange); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;">3</div>
+              <span>치료 계획 수립 및 실행</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+
+  <!-- 서버 데이터 전달 -->
+  <script type="text/template" id="serverDataTemplate">
+    {% if image_data %}
+    window.serverData = { hasImage: true, imageData: '{{ image_data }}' };
+    {% else %}
+    window.serverData = { hasImage: false, imageData: '' };
+    {% endif %}
+  </script>
+  <script>
+    // 서버 데이터 초기화
+    const template = document.getElementById('serverDataTemplate');
+    if (template) { eval(template.textContent); }
+
+    // 모드 전환
+    function switchMode(mode) {
+      // 탭 활성화
+      document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // 페이지 전환
+      document.querySelectorAll('.page-content').forEach(page => page.classList.remove('active'));
+      document.getElementById(mode + '-mode').classList.add('active');
+      
+      // 사용자 배지 업데이트
+      const userBadge = document.querySelector('.user-badge');
+      if (mode === 'medical') {
+        userBadge.innerHTML = '👨‍⚕️ 의료진 모드';
+      } else {
+        userBadge.innerHTML = '👤 환자 모드';
+      }
+    }
+
+    // 진단 탭 전환
+    function switchTab(tabId) {
+      // 탭 버튼 활성화
+      document.querySelectorAll('.diagnosis-tab').forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // 탭 콘텐츠 전환
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // 파일 업로드 처리
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const preview = document.getElementById('imagePreview');
+          preview.innerHTML = `<img src="${e.target.result}" alt="미리보기" style="max-width: 100%; height: auto;">`;
+          
+          // 분석 버튼 활성화
+          document.getElementById('analyzeBtn').disabled = false;
+          
+          // 상태 표시
+          const status = document.getElementById('uploadStatus');
+          const statusText = document.getElementById('statusText');
+          status.style.display = 'block';
+          statusText.textContent = '✅ 파일 업로드 완료! AI 분석을 시작할 수 있습니다.';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // 폼 초기화
+    function resetForm() {
+      document.getElementById('uploadForm').reset();
+      document.getElementById('imagePreview').innerHTML = '<div style="color: #666;">이미지를 업로드하면 여기에 표시됩니다</div>';
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('uploadStatus').style.display = 'none';
+    }
+
+    // 차트 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+      // 신뢰도 바 애니메이션
+      const confidenceBar = document.querySelector('.confidence-bar-fill');
+      if (confidenceBar) {
+        const width = confidenceBar.getAttribute('data-width');
+        if (width) {
+          setTimeout(() => {
+            confidenceBar.style.width = width + '%';
+          }, 300);
+        }
+      }
+
+      const canvas = document.getElementById('probabilityChart');
+      if (canvas) {
+        let labels, probs;
+        try {
+          labels = JSON.parse('{{ selected_class_names|tojson|safe if selected_class_names is defined else class_names_8|tojson|safe if class_names_8 is defined else "[]" }}');
+          probs = JSON.parse('{{ (probs|tojson|safe if probs is defined else "[]") }}');
+        } catch {
+          labels = []; probs = [];
+        }
+
+        if (labels.length > 0 && probs.length > 0) {
+          new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
+                data: probs.map(p => p * 100),
+                backgroundColor: '#42A5F5',
+                borderRadius: 4
+              }]
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }
+              }
+            }
+          });
+        }
+      }
+    });
+
+    // 로그아웃
+    function logout() {
+      if (confirm('로그아웃 하시겠습니까?')) {
+        window.location.href = '/logout';
+      }
+    }
+  </script>
+</body>
+</html>

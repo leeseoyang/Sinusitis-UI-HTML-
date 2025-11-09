@@ -8,7 +8,7 @@ import json
 import io
 import base64
 from typing import Dict, Optional, Any, TYPE_CHECKING
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 
 # TensorFlow 모델 타입 정의 (타입 체킹용)
 if TYPE_CHECKING:
@@ -97,6 +97,12 @@ model_8class, model_4class, class_names_8, class_names_4 = _load_models_and_clas
 def index():
     return render_template('index.html')
 
+@app.route('/test')
+def test_basic():
+    """기본 기능 테스트 페이지"""
+    with open('test_basic.html', 'r', encoding='utf-8') as f:
+        return f.read()
+
 @app.route('/predict', methods=['POST'])
 def predict():
     # 지연 임포트 (개발 환경에서 불필요한 임포트 오류 완화)
@@ -171,14 +177,25 @@ def predict():
         from utils.roi import summarize_side_scores, draw_boxes_on_image
 
         side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names)  # type: ignore
+        print(f"🔍 Side scores: {side_scores}")  # 디버깅용
+        
         bgr = cv2.cvtColor(np.array(corrected_pil.convert('L')), cv2.COLOR_GRAY2BGR)
         boxed_bgr = draw_boxes_on_image(bgr.copy(), side_scores, label=pred_class, conf=confidence)  # type: ignore
 
         buf2 = io.BytesIO()
         img_rgb = cv2.cvtColor(boxed_bgr, cv2.COLOR_BGR2RGB)  # type: ignore
-        Image.fromarray(img_rgb).save(buf2, format='PNG')  # type: ignore
+        
+        # 이미지 크기 최적화 (품질을 약간 낮춰서 크기 줄이기)
+        pil_img = Image.fromarray(img_rgb)  # type: ignore
+        pil_img.save(buf2, format='PNG', optimize=True, compress_level=6)
+        
         boxed_base64 = base64.b64encode(buf2.getvalue()).decode('utf-8')
-    except Exception:
+        print(f"✅ ROI 이미지 생성 성공 (길이: {len(boxed_base64)})") 
+        print(f"📊 ROI 이미지 크기: {len(buf2.getvalue())} bytes")  # 추가 디버깅
+    except Exception as e:
+        print(f"❌ ROI 이미지 생성 실패: {e}")  # 디버깅용
+        import traceback
+        traceback.print_exc()  # 전체 에러 스택 출력
         boxed_base64 = None
 
     # 이미지 base64 인코딩
@@ -199,6 +216,142 @@ def predict():
         right_score=float(side_scores.get('right', 0.0)),
         model_type=model_type
     )
+
+@app.route('/medical')
+def medical_dashboard():
+    """의료진 전용 대시보드"""
+    return render_template('index.html', mode='medical')
+
+@app.route('/patient')
+def patient_view():
+    """환자용 화면"""
+    return render_template('index.html', mode='patient')
+
+@app.route('/api/switch-mode', methods=['POST'])
+def switch_mode() -> Dict[str, str]:
+    """모드 전환 API"""
+    data = request.get_json()
+    mode = data.get('mode', 'medical') if data else 'medical'
+    return {'status': 'success', 'mode': mode}
+
+@app.route('/api/chat', methods=['POST'])
+def ai_chat():
+    """AI 상담 API - 실제 진단 결과를 기반으로 응답"""
+    data = request.get_json()
+    question = data.get('question', '') if data else ''
+    
+    # 세션이나 전역변수에서 최근 진단 결과를 가져와야 하지만,
+    # 간단한 구현을 위해 요청 데이터에서 가져오기
+    diagnosis_data = data.get('diagnosisData', {}) if data else {}
+    
+    # 디버깅: 받은 데이터 출력
+    print(f"🤖 AI 상담 요청 받음:")
+    print(f"   질문: {question}")
+    print(f"   진단 데이터: {diagnosis_data}")
+    
+    # 진단 근거 관련 질문 처리
+    if any(keyword in question for keyword in ['근거', '어떤', '내 진단', 'Right-Mucosal', 'Left-Mucosal', '결과', '설명']):
+        response = generate_diagnosis_explanation(question, diagnosis_data) # type: ignore
+    else:
+        response = generate_general_response(question)
+    
+    print(f"🤖 AI 응답 생성 완료 (길이: {len(response)})")
+    return jsonify({'response': response})
+
+def generate_diagnosis_explanation(question: str, diagnosis_data: Dict[str, Any]) -> str:
+    """진단 근거 설명 생성"""
+    prediction = diagnosis_data.get('prediction', '')
+    confidence = diagnosis_data.get('confidence', 0)
+    left_score = diagnosis_data.get('leftScore', 0)
+    right_score = diagnosis_data.get('rightScore', 0)
+    model_type = diagnosis_data.get('modelType', '8class')
+    
+    if not prediction:
+        return "아직 진단이 수행되지 않았습니다. 먼저 X-ray 이미지를 업로드하고 분석을 진행해 주세요."
+    
+    response = f"**현재 진단 결과: {prediction}**\n\n"
+    response += "**AI 진단 근거 상세 분석:**\n\n"
+    
+    # 신뢰도 설명
+    if confidence > 0:
+        response += f"**1. 진단 신뢰도: {confidence:.1f}%**\n"
+        if confidence >= 90:
+            response += "• 매우 높은 확신도로 진단되었습니다\n"
+            response += "• 영상에서 명확한 특징이 관찰되었습니다\n"
+        elif confidence >= 70:
+            response += "• 중간 정도의 확신도로 진단되었습니다\n"
+            response += "• 추가적인 임상 소견 검토가 도움이 될 수 있습니다\n"
+        else:
+            response += "• 비교적 낮은 확신도입니다\n"
+            response += "• 재검사나 다른 진단법 고려가 필요할 수 있습니다\n"
+    
+    # ROI 분석 결과
+    if left_score > 0 or right_score > 0:
+        response += f"\n**2. 부비동 영역별 분석:**\n"
+        response += f"• 좌측 부비동 이상 소견: {left_score*100:.1f}%\n"
+        response += f"• 우측 부비동 이상 소견: {right_score*100:.1f}%\n"
+    
+    # 진단별 상세 근거
+    response += "\n**3. 진단 근거 설명:**\n"
+    if "Right-Mucosal" in prediction:
+        response += "• **우측 상악동 점막 비후 진단:**\n"
+        response += f"  - 우측 부비동에서 {right_score*100:.1f}% 확률로 이상 소견이 감지되었습니다\n"
+        response += "  - 점막 비후(Mucosal thickening) 소견이 관찰됩니다\n"
+        response += "  - 염증으로 인한 우측 상악동 점막의 부종이 확인됩니다\n"
+        response += "  - X-ray에서 우측 상악동 부위의 혼탁도가 증가했습니다\n"
+        response += "  - 정상적인 공기 음영이 감소하고 연조직 음영이 증가했습니다\n"
+    elif "Left-Mucosal" in prediction:
+        response += "• **좌측 상악동 점막 비후 진단:**\n"
+        response += f"  - 좌측 부비동에서 {left_score*100:.1f}% 확률로 이상 소견이 감지되었습니다\n"
+        response += "  - 점막 비후(Mucosal thickening) 소견이 관찰됩니다\n"
+        response += "  - 염증으로 인한 좌측 상악동 점막의 부종이 확인됩니다\n"
+    elif "Both" in prediction or "Bilateral" in prediction:
+        response += "• **양측 부비동염 진단:**\n"
+        response += f"  - 좌측 부비동 이상 소견: {left_score*100:.1f}%\n"
+        response += f"  - 우측 부비동 이상 소견: {right_score*100:.1f}%\n"
+        response += "  - 양쪽 부비동 모두에서 염증성 변화가 관찰됩니다\n"
+        response += "  - 전반적인 부비동 염증 상태가 확인됩니다\n"
+        response += "  - 좌우 대칭적 또는 비대칭적 염증 패턴을 보입니다\n"
+        response += "  - X-ray에서 양측 상악동 모두 혼탁도가 증가했습니다\n"
+        response += "  - 양측 모두에서 정상적인 공기 음영이 감소했습니다\n"
+    elif "Normal" in prediction:
+        response += "• **정상 판정 근거:**\n"
+        response += "  - 양쪽 부비동 모두 정상 범위의 투명도를 보입니다\n"
+        response += "  - 점막 비후나 삼출액 소견이 관찰되지 않습니다\n"
+    
+    # 모델 정보
+    response += "\n**4. 분석 모델 정보:**\n"
+    if model_type == '8class':
+        response += "• 8클래스 정밀 진단 모델 사용\n"
+        response += "• 좌우별, 증상별 세분화 분석 (점막비후, 기액면, 혼탁 구분)\n"
+    else:
+        response += "• 4클래스 빠른 진단 모델 사용\n"
+    
+    response += "\n**⚠️ 중요 안내:**\n"
+    response += "• 본 AI 분석은 보조 진단 도구입니다\n"
+    response += "• 최종 진단은 의료진의 종합적 판단이 필요합니다\n"
+    
+    return response
+
+def generate_general_response(question: str) -> str:
+    """일반적인 AI 응답 생성"""
+    responses = {
+        '부비동염': "부비동염은 부비동에 염증이 생기는 질환입니다...",
+        '치료': "부비동염 치료는 항생제, 비강스프레이 등을 사용합니다...",
+        '예방': "부비동염 예방을 위해서는 손씻기, 실내습도 유지 등이 중요합니다..."
+    }
+    
+    for keyword, response in responses.items():
+        if keyword in question:
+            return response
+    
+    return "죄송합니다. 구체적인 질문을 해주시면 더 정확한 답변을 드릴 수 있습니다."
+
+@app.route('/logout')
+def logout():
+    """로그아웃 처리"""
+    # 실제 환경에서는 세션 관리 로직 추가
+    return render_template('login.html') if False else "로그아웃 완료"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

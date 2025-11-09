@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기본 기능 테스트</title>
+</head>
+<body>
+    <h1>부비동염 AI 진단 - 기본 테스트</h1>
+    
+    <form id="testForm" action="/predict" method="post" enctype="multipart/form-data">
+        <div>
+            <label for="image">이미지 파일:</label>
+            <input type="file" name="image" id="image" accept="image/*" required>
+        </div>
+        <div>
+            <label for="model_type">모델 타입:</label>
+            <select name="model_type" id="model_type">
+                <option value="8class">8클래스 (정밀)</option>
+                <option value="4class">4클래스 (빠름)</option>
+            </select>
+        </div>
+        <button type="submit">분석 시작</button>
+    </form>
+
+    <script>
+        console.log('테스트 페이지 로드 완료');
+        
+        document.getElementById('testForm').addEventListener('submit', function(e) {
+            console.log('폼 제출 시작');
+            const fileInput = document.getElementById('image');
+            if (!fileInput.files[0]) {
+                alert('이미지 파일을 선택해주세요.');
+                e.preventDefault();
+                return;
+            }
+            console.log('선택된 파일:', fileInput.files[0].name);
+        });
+    </script>
+</body>
+</html>

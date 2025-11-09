@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>부비동염 판별기 — 가로형 3열 레이아웃 (QC 유지)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root{
+      --medical-blue:#1565C0; --medical-light-blue:#42A5F5;
+      --medical-green:#2E7D32; --medical-light-green:#66BB6A;
+      --medical-red:#C62828; --medical-orange:#FF7043;
+      --medical-gray:#37474F; --medical-light-gray:#78909C;
+      --bg:#f8f9fa; --surface:#ffffff; --surface-2:#f1f3f4;
+      --border:#e1e5e9; --text:#212529; --muted:#6c757d;
+      --primary:var(--medical-blue); --accent:var(--medical-green);
+      --warn:var(--medical-orange); --danger:var(--medical-red);
+      --shadow:0 2px 8px rgba(0,0,0,0.08); --radius:10px; --gap:18px;
+      --maxw:1500px; --logo-size:56px; --sticky-offset:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:18px;line-height:1.5}
+    .container{width:min(var(--maxw),98vw)}
+
+    header{display:flex;gap:14px;align-items:center;margin-bottom:14px;padding:14px 16px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow)}
+    .logo-wrap{width:var(--logo-size);height:var(--logo-size);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--primary);flex:0 0 auto}
+    .logo-wrap img{width:100%;height:100%;object-fit:contain;display:block}
+    header h1{margin:0;font-size:clamp(20px,2.6vw,26px);letter-spacing:-0.02em;font-weight:800}
+    header .sub{color:var(--muted);font-size:14px;margin-top:4px}
+
+    .grid{
+      display:grid;
+      grid-template-columns: 320px 1fr 1fr;
+      gap:var(--gap);
+      align-items:start;
+      min-height:calc(100vh - 160px);
+    }
+    @media (max-width: 1280px){ .grid{ grid-template-columns: 300px 1fr 1fr; } }
+    @media (max-width: 1080px){ .grid{ grid-template-columns: 280px 1fr; grid-auto-rows: minmax(200px, auto); }
+      .col-results{ grid-column: 1 / -1; }
+    }
+    @media (max-width: 760px){ .grid{ grid-template-columns: 1fr; } }
+
+    .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);padding:16px}
+    .card h2{margin:0 0 12px;font-size:18px;font-weight:700;letter-spacing:-0.01em}
+    .col-controls{position:sticky; top:var(--sticky-offset); align-self:start; max-height:calc(100dvh - 2*var(--sticky-offset)); overflow:auto}
+    .section{display:flex;flex-direction:column;gap:12px}
+
+    .upload-btn{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;padding:18px;border:2px dashed var(--border);background:var(--surface-2);border-radius:12px;cursor:pointer;transition:.2s}
+    .upload-btn:hover{border-color:var(--primary); background:var(--surface)}
+    .upload-icon{font-size:28px}
+    .hint{color:var(--muted);font-size:12px}
+
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:600;font-size:14px}
+    .btn:hover{background:var(--surface-2);border-color:var(--primary)}
+    .btn--primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .btn--primary:hover{background:var(--medical-light-blue)}
+
+    .col-preview .stack{display:grid;grid-template-rows: minmax(320px, 1fr) auto; gap:var(--gap)}
+    .media{display:flex;align-items:center;justify-content:center;background:#0c0f14;border-radius:12px;border:1px solid var(--border);padding:8px}
+    .media img{max-width:100%;max-height:62vh;object-fit:contain;border-radius:8px}
+
+    .col-results .grid-in{display:grid;grid-template-rows:auto auto auto 1fr;gap:var(--gap)}
+
+    .prediction-result{background:linear-gradient(135deg, rgba(138,180,248,0.12), rgba(11,91,54,0.06));border:1px solid rgba(138,180,248,0.25);border-radius:12px;padding:14px}
+    .prediction-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-weight:800;font-size:12px}
+    .badge--ok{background:rgba(102,187,106,.15);color:#1b5e20;border:1px solid rgba(102,187,106,.4)}
+    .badge--warn{background:rgba(255,167,38,.15);color:#e65100;border:1px solid rgba(255,167,38,.4)}
+    .badge--danger{background:rgba(229,57,53,.15);color:#b71c1c;border:1px solid rgba(229,57,53,.4)}
+
+    .prediction-summary{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+    .prediction-label{font-weight:800}
+    .confidence-bar{height:8px;background:var(--border);border-radius:6px;overflow:hidden;margin-top:6px}
+    .confidence-fill{height:100%;background:linear-gradient(90deg,var(--medical-light-green),var(--warn));border-radius:6px;transition:width .4s ease}
+    .prediction-details{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}
+
+    .chart-card{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+
+    .roi-section{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+    .roi-scores{display:flex;justify-content:space-between;gap:8px;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px}
+    .roi-score{color:var(--medical-green);font-weight:700}
+
+    .qc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .qc-item{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px}
+    .qc-item strong{font-size:12px;color:var(--muted)}
+    .qc-value{font-size:16px;font-weight:800;margin-top:4px}
+    .qc-status{margin-top:6px}
+
+    .sr-only{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
+  </style>
+</head>
+<body>
+  <div class="container" role="main" aria-label="부비동염 판별기">
+    <header>
+      <div class="logo-wrap" id="logoWrap" aria-hidden="false">
+        <img id="pageLogo" src="logo.png" alt="건양대학교 로고" onerror="this.style.display='none'; document.getElementById('logoText').style.display='block'">
+        <div id="logoText" style="display:none;color:#fff;font-weight:800">KONYANG</div>
+      </div>
+      <div>
+        <h1>부비동염 AI 진단 시스템</h1>
+        <div class="sub">X-ray 영상을 분석하여 정확한 부비동 상태를 진단합니다</div>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+        <div role="group" aria-label="로고 크기 제어" style="display:flex; gap:6px;">
+          <button class="btn" id="logoSmallBtn" title="작게" aria-pressed="false">S</button>
+          <button class="btn btn--primary" id="logoMidBtn" title="중간" aria-pressed="true">M</button>
+          <button class="btn" id="logoLargeBtn" title="크게" aria-pressed="false">L</button>
+        </div>
+        <button class="btn" id="changeLogoBtn" title="로고 교체">로고 변경</button>
+        <input id="logoUpload" type="file" accept=".svg,image/*" class="sr-only" />
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- 좌측: 제어 패널 -->
+      <section class="card col-controls" aria-labelledby="uploadTitle">
+        <h2 id="uploadTitle">의료 영상 분석</h2>
+        <form id="predictForm" action="/predict" method="post" enctype="multipart/form-data" class="section">
+          <input id="fileInput" type="file" name="image" accept="image/*" style="display:none" required />
+          <button type="button" class="upload-btn" id="chooseBtn">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text" style="font-weight:700">파일 선택</div>
+            <div class="hint">DICOM, JPG, PNG | 최대 10MB</div>
+          </button>
+          <div class="hint" id="statusText">파일을 선택해주세요</div>
+
+          <div class="card" style="padding:12px;">
+            <h3 style="margin:0 0 8px;font-size:15px">진단 모델 선택</h3>
+            <label style="display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer">
+              <input type="radio" name="model_type" value="8class" {% if model_type != '4class' %}checked{% endif %}>
+              <div>
+                <div style="font-weight:700">8분류 모델</div>
+                <div class="hint">좌/우/정상/양측 세부 8분류</div>
+              </div>
+            </label>
+            <label style="display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer">
+              <input type="radio" name="model_type" value="4class" {% if model_type == '4class' %}checked{% endif %}>
+              <div>
+                <div style="font-weight:700">4분류 모델</div>
+                <div class="hint">좌/우/정상/양측 4분류</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" id="predictBtn" disabled>AI 진단 시작</button>
+            <button type="button" class="btn" id="exportBtn">결과 저장</button>
+            <button type="button" class="btn" id="resetBtn">새 이미지</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 중앙: 미리보기/분석대상 -->
+      <section class="card col-preview">
+        <h2 style="margin-bottom:10px">영상 미리보기</h2>
+        <div class="stack">
+          <div id="previewWrap" style="display:none">
+            <div class="media"><img id="previewImg" alt="업로드 미리보기" /></div>
+          </div>
+
+          {% if image_data %}
+          <div>
+            <h3 style="margin:6px 0 8px;font-size:15px">분석 대상</h3>
+            <div class="media"><img src="data:image/png;base64,{{ image_data }}" alt="업로드된 X-ray 이미지" /></div>
+          </div>
+          {% endif %}
+
+          {% if boxed_image_data %}
+          <div>
+            <h3 style="margin:6px 0 8px;font-size:15px">부비동 영역 감지 (ROI)</h3>
+            <div class="media"><img src="data:image/png;base64,{{ boxed_image_data }}" alt="부비동 ROI" /></div>
+            {% if left_score is defined and right_score is defined %}
+            <div class="roi-scores">
+              <span class="roi-score">좌측: {{ (left_score * 100) | round(1) }}%</span>
+              <span class="roi-score">우측: {{ (right_score * 100) | round(1) }}%</span>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- 우측: 분석 결과 -->
+      <aside class="col-results">
+        <div class="grid-in">
+          <section class="card">
+            <h2 id="visualTitle">분석 결과</h2>
+            {% if prediction %}
+            <div class="prediction-result" role="status" aria-live="polite">
+              <div class="prediction-header">
+                <strong>진단 결과</strong>
+                <span id="uncertaintyBadge" class="badge badge--ok" title="모델 확신도 배지" style="display:none"></span>
+              </div>
+              <div class="prediction-summary">
+                <div class="prediction-label" id="predLabel">{{ prediction }}</div>
+                <div style="font-weight:800" id="predTop1">{{ confidence | round(1) }}%</div>
+              </div>
+              <div class="confidence-bar"><div class="confidence-fill" id="confFill" data-confidence="{{ confidence }}"></div></div>
+              <div class="prediction-details">
+                <span id="marginText">마진: -</span>
+                <span id="entropyText">엔트로피: -</span>
+                <span id="confNormText">정규화 확신도: -</span>
+                <span>{% if model_type == '8class' %}정밀 진단{% else %}빠른 진단{% endif %}</span>
+              </div>
+            </div>
+            {% else %}
+              <div class="hint">AI 분석 후 결과가 여기에 표시됩니다.</div>
+            {% endif %}
+          </section>
+
+          <section class="card chart-card">
+            <h2 style="margin-bottom:8px">클래스 확률 분포</h2>
+            <canvas id="barChart" aria-label="각 클래스별 예측 확률 분포" role="img" height="170"></canvas>
+          </section>
+
+          <!-- QC 카드 -->
+          <section class="card">
+            <h2 style="margin-bottom:8px">촬영 품질(QC) 점검</h2>
+            <div class="qc-grid">
+              <div class="qc-item">
+                <strong>밝기(μ)</strong>
+                <div class="qc-value" id="qcBrightness">-</div>
+                <div class="qc-status" id="qcBrightnessMsg"></div>
+              </div>
+              <div class="qc-item">
+                <strong>대비(σ)</strong>
+                <div class="qc-value" id="qcContrast">-</div>
+                <div class="qc-status" id="qcContrastMsg"></div>
+              </div>
+              <div class="qc-item">
+                <strong>기울기(°)</strong>
+                <div class="qc-value" id="qcTilt">-</div>
+                <div class="qc-status" id="qcTiltMsg"></div>
+              </div>
+            </div>
+            <div class="hint" style="margin-top:8px">* 임상 참고용: 과노출/저노출, 과도한 기울어짐은 결과 신뢰도를 낮출 수 있습니다.</div>
+          </section>
+
+          <section class="card">
+            <h2 style="margin-bottom:8px">참고 정보</h2>
+            <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.7">
+              <li>상단 왼쪽 패널에서 이미지 선택 및 모델 변경</li>
+              <li>중앙 패널에서 원본/ROI를 한눈에 확인</li>
+              <li>우측 패널에 진단 요약과 확률 막대 그래프 제공</li>
+            </ul>
+          </section>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="srStatus" class="sr-only" role="status" aria-live="polite"></div>
+
+  <!-- 서버 데이터를 JavaScript로 전달 -->
+  <script type="text/template" id="serverDataTemplate">
+    {% if image_data %}
+    window.serverData = { hasImage: true, imageData: '{{ image_data }}' };
+    {% else %}
+    window.serverData = { hasImage: false, imageData: '' };
+    {% endif %}
+  </script>
+  <script>
+    // 템플릿에서 서버 데이터 추출
+    const template = document.getElementById('serverDataTemplate');
+    if (template) {
+      eval(template.textContent);
+    }
+  </script>
+
+  <script>
+    // 접근성 알림
+    function announce(msg){ const el = document.getElementById('srStatus'); if(el) el.textContent = msg; }
+
+    // 로고 크기 제어
+    const logoUpload = document.getElementById('logoUpload');
+    const pageLogo = document.getElementById('pageLogo');
+    const logoText = document.getElementById('logoText');
+    const smallBtn = document.getElementById('logoSmallBtn');
+    const midBtn = document.getElementById('logoMidBtn');
+    const largeBtn = document.getElementById('logoLargeBtn');
+
+    function setLogoSize(px){
+      document.documentElement.style.setProperty('--logo-size', px + 'px');
+      smallBtn?.setAttribute('aria-pressed', String(px===40));
+      midBtn?.setAttribute('aria-pressed', String(px===56));
+      largeBtn?.setAttribute('aria-pressed', String(px===80));
+      announce(`로고 크기 ${px}px`);
+    }
+    smallBtn?.addEventListener('click', ()=> setLogoSize(40));
+    midBtn?.addEventListener('click', ()=> setLogoSize(56));
+    largeBtn?.addEventListener('click', ()=> setLogoSize(80));
+    document.getElementById('changeLogoBtn')?.addEventListener('click', ()=> logoUpload.click());
+    logoUpload?.addEventListener('change', async (ev)=>{
+      const f = ev.target.files && ev.target.files[0]; if(!f) return;
+      if(f.size > 5*1024*1024){ alert('5MB 이하 파일을 사용하세요.'); return; }
+      const ext = (f.name.split('.').pop()||'').toLowerCase();
+      if(ext === 'svg'){
+        const text = await f.text(); const blob = new Blob([text], {type: 'image/svg+xml'});
+        pageLogo.src = URL.createObjectURL(blob); pageLogo.style.display='block'; logoText.style.display='none';
+      } else {
+        const reader = new FileReader();
+        reader.onload = ()=>{ pageLogo.src = reader.result; pageLogo.style.display='block'; logoText.style.display='none'; };
+        reader.readAsDataURL(f);
+      }
+      announce('로고가 교체되었습니다');
+    });
+
+    // 파일 선택/미리보기
+    const fileInput = document.getElementById('fileInput');
+    const chooseBtn = document.getElementById('chooseBtn');
+    const predictBtn = document.getElementById('predictBtn');
+    const previewWrap = document.getElementById('previewWrap');
+    const previewImg = document.getElementById('previewImg');
+    const statusText = document.getElementById('statusText');
+
+    function enableSubmitIfFile(){
+      const hasFile = fileInput?.files && fileInput.files.length > 0;
+      if(predictBtn) predictBtn.disabled = !hasFile;
+      statusText && (statusText.textContent = hasFile ? '✅ 파일 선택 완료! AI 진단을 시작하세요' : '파일을 선택해주세요');
+    }
+
+    chooseBtn?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) handlePreview(e.target.files[0]); });
+
+    function handlePreview(file){
+      statusText && (statusText.textContent = '📤 이미지 처리 중...');
+      const reader = new FileReader();
+      reader.onload = () => {
+        if(previewImg) previewImg.src = reader.result;
+        if(previewWrap) previewWrap.style.display = 'block';
+        statusText && (statusText.textContent = '✅ 파일 선택 완료! AI 진단을 시작하세요');
+        enableSubmitIfFile(); announce('이미지 업로드 완료');
+
+        // 업로드 즉시 QC 계산 + 저장
+        computeQCFromDataURL(reader.result).catch(console.error);
+      };
+      reader.onerror = () => { statusText && (statusText.textContent = '❌ 파일 읽기 오류. 다른 파일을 선택해주세요'); };
+      reader.readAsDataURL(file);
+    }
+
+    // 다시 예측(새 이미지)
+    document.getElementById('resetBtn')?.addEventListener('click', function(){
+      const form = document.getElementById('predictForm');
+      form?.reset(); if(previewWrap) previewWrap.style.display = 'none';
+      if(fileInput) fileInput.value = ''; if(predictBtn) predictBtn.disabled = true;
+
+      // QC 리셋 + 저장값 제거
+      ['qcBrightness','qcContrast','qcTilt','qcBrightnessMsg','qcContrastMsg','qcTiltMsg'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='-'; });
+      try{ localStorage.removeItem('qcCache'); }catch{}
+      setTimeout(()=> fileInput?.click(), 120);
+    });
+
+    document.addEventListener('DOMContentLoaded', function(){
+      const fill = document.getElementById('confFill');
+      if(fill){ const v = fill.getAttribute('data-confidence'); if(v) fill.style.width = Math.max(0, Math.min(100, Number(v))) + '%'; }
+      setLogoSize(56);
+      initMetricsAndChart();
+
+      // ★ QC 유지: 서버가 반환한 이미지로 재계산 or 저장값 복원
+      if(window.serverData && window.serverData.hasImage && window.serverData.imageData) {
+        const serverImg = 'data:image/png;base64,' + window.serverData.imageData;
+        computeQCFromDataURL(serverImg).catch(() => restoreQCFromCache());
+      } else {
+        restoreQCFromCache();
+      }
+    });
+
+    // 클래스 설명(툴팁용)
+    const CLASS_DESC = {
+      "Normal":"정상 소견",
+      "Left-Mucosal":"좌측 점막 비후",
+      "Right-Mucosal":"우측 점막 비후",
+      "Left-Haziness":"좌측 혼탁",
+      "Right-Haziness":"우측 혼탁",
+      "Left-Air Fluid":"좌측 수평 수액면",
+      "Right-Air Fluid":"우측 수평 수액면",
+      "Both":"양측 병변"
+    };
+
+    function initMetricsAndChart(){
+      const canvas = document.getElementById('barChart');
+      if(!canvas) return;
+
+      let labelsRaw, probsRaw;
+      try{
+        labelsRaw = JSON.parse('{{ selected_class_names|tojson|safe if selected_class_names is defined else class_names_8|tojson|safe if class_names_8 is defined else "[]" }}');
+        probsRaw  = JSON.parse('{{ (probs|tojson|safe if probs is defined else "[]") }}');
+      }catch{ labelsRaw = []; probsRaw = []; }
+
+      if(!Array.isArray(labelsRaw) || !Array.isArray(probsRaw) || labelsRaw.length===0 || probsRaw.length===0){
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#999'; ctx.font = '13px system-ui';
+        ctx.fillText('🔍 AI 분석 후 결과가 여기에 표시됩니다', 12, 22);
+        return;
+      }
+
+      const zipped = labelsRaw.map((l,i)=>({label:l, p:probsRaw[i]})).sort((a,b)=> b.p - a.p);
+      const labels = zipped.map(z=>z.label);
+      const probs  = zipped.map(z=>z.p);
+
+      const top1 = probs[0]||0, top2 = probs[1]||0;
+      const margin = Math.max(0, top1 - top2);
+      const C = probs.length||1;
+      const entropy = -probs.reduce((s,p)=> s + (p>0 ? p*Math.log(p) : 0), 0);
+      const confNorm = 1 - (entropy / Math.log(C));
+
+      const marginText = document.getElementById('marginText');
+      const entropyText = document.getElementById('entropyText');
+      const confNormText = document.getElementById('confNormText');
+      const predTop1 = document.getElementById('predTop1');
+      const predLabel = document.getElementById('predLabel');
+
+      if(predTop1) predTop1.textContent = (top1*100).toFixed(1) + '%';
+      if(predLabel) predLabel.textContent = labels[0] || '—';
+      if(marginText) marginText.textContent = `마진: ${(margin*100).toFixed(1)}pp`;
+      if(entropyText) entropyText.textContent = `엔트로피: ${entropy.toFixed(3)}`;
+      if(confNormText) confNormText.textContent = `정규화 확신도: ${(confNorm*100).toFixed(1)}%`;
+
+      const badge = document.getElementById('uncertaintyBadge');
+      if(badge){
+        let level = 'ok', text = '확신 높음';
+        if(margin < 0.15 || confNorm < 0.60){ level='warn'; text='불확실 — 재확인 권장'; }
+        if(margin < 0.08 || confNorm < 0.45){ level='danger'; text='불확실 높음 — 재촬영/재진단 고려'; }
+        badge.className = `badge ${level==='ok'?'badge--ok':level==='warn'?'badge--warn':'badge--danger'}`;
+        badge.style.display = 'inline-flex';
+        badge.textContent = text;
+        badge.title = `마진 ${(margin*100).toFixed(1)}pp, 확신 ${(confNorm*100).toFixed(1)}%`;
+      }
+
+      const ctx = canvas.getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: probs.map(p=>p*100),
+            borderWidth:0,
+            backgroundColor: labels.map(()=> '#67d3e0')
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero:true, max:100, ticks: { callback: v => v + '%' } },
+            y: { ticks:{} }
+          },
+          plugins: {
+            legend:{ display:false },
+            tooltip:{
+              callbacks:{
+                label: ctx => ` ${ctx.raw.toFixed(2)}%`,
+                afterLabel: ctx => {
+                  const lbl = ctx.label;
+                  const desc = CLASS_DESC[lbl] || '';
+                  return desc ? `\n${desc}` : '';
+                }
+              }
+            }
+          },
+          animation: { duration: 380 }
+        }
+      });
+
+      const fill = document.getElementById('confFill');
+      if(fill) fill.style.width = Math.max(0, Math.min(100, top1*100)) + '%';
+    }
+
+    // ===== QC 계산/표시 + 저장/복원 =====
+    function setQCValues(mu, sigma, angleDeg){
+      const bEl = document.getElementById('qcBrightness');
+      const cEl = document.getElementById('qcContrast');
+      const tEl = document.getElementById('qcTilt');
+      const bMsg = document.getElementById('qcBrightnessMsg');
+      const cMsg = document.getElementById('qcContrastMsg');
+      const tMsg = document.getElementById('qcTiltMsg');
+
+      if(bEl) bEl.textContent = mu.toFixed(1);
+      if(cEl) cEl.textContent = sigma.toFixed(1);
+      if(tEl) tEl.textContent = angleDeg.toFixed(1);
+
+      if(bMsg){
+        if(mu < 60) { bMsg.textContent='저노출 의심'; bMsg.style.color='var(--danger)'; }
+        else if(mu > 190){ bMsg.textContent='과노출 의심'; bMsg.style.color='var(--warn)'; }
+        else { bMsg.textContent='적정'; bMsg.style.color='var(--accent)'; }
+      }
+      if(cMsg){
+        if(sigma < 30){ cMsg.textContent='대비 낮음(흐림)'; cMsg.style.color='var(--warn)'; }
+        else if(sigma > 85){ cMsg.textContent='대비 높음(거침)'; cMsg.style.color='var(--warn)'; }
+        else { cMsg.textContent='적정'; cMsg.style.color='var(--accent)'; }
+      }
+      if(tMsg){
+        if(angleDeg > 8){ tMsg.textContent='기울기 큼 — 재촬영 권장'; tMsg.style.color='var(--danger)'; }
+        else if(angleDeg > 4){ tMsg.textContent='약간 기울어짐'; tMsg.style.color='var(--warn)'; }
+        else { tMsg.textContent='적정'; tMsg.style.color='var(--accent)'; }
+      }
+
+      // ★ QC 유지: 저장
+      try{
+        localStorage.setItem('qcCache', JSON.stringify({mu, sigma, angleDeg}));
+      }catch{}
+    }
+
+    function restoreQCFromCache(){
+      try{
+        const raw = localStorage.getItem('qcCache');
+        if(!raw) return;
+        const {mu, sigma, angleDeg} = JSON.parse(raw);
+        if(typeof mu === 'number' && typeof sigma === 'number' && typeof angleDeg === 'number'){
+          setQCValues(mu, sigma, angleDeg);
+        }
+      }catch{}
+    }
+
+    async function computeQCFromDataURL(dataURL){
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = dataURL;
+      await img.decode();
+
+      const w = 512;
+      const h = Math.max(1, Math.round(img.height * (w / img.width)));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d', {willReadFrequently:true});
+      ctx.drawImage(img, 0, 0, w, h);
+      const { data } = ctx.getImageData(0, 0, w, h);
+
+      let sum=0, sum2=0, N=w*h;
+      const gray = new Float32Array(N);
+      for(let i=0, j=0;i<data.length;i+=4, j++){
+        const g = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+        gray[j]=g; sum+=g; sum2+=g*g;
+      }
+      const mu = sum/N;
+      const sigma = Math.sqrt(Math.max(0, sum2/N - mu*mu));
+
+      let m00=0, m10=0, m01=0;
+      for(let y=0, idx=0; y<h; y++){
+        for(let x=0; x<w; x++, idx++){
+          const v = gray[idx];
+          m00 += v; m10 += x*v; m01 += y*v;
+        }
+      }
+      const xc = m10/m00, yc = m01/m00;
+      let mu20=0, mu02=0, mu11=0;
+      for(let y=0, idx=0; y<h; y++){
+        for(let x=0; x<w; x++, idx++){
+          const v = gray[idx];
+          mu20 += (x-xc)*(x-xc)*v;
+          mu02 += (y-yc)*(y-yc)*v;
+          mu11 += (x-xc)*(y-yc)*v;
+        }
+      }
+      const angleRad = 0.5 * Math.atan2(2*mu11, (mu20 - mu02));
+      const angleDeg = Math.abs(angleRad * 180 / Math.PI);
+
+      setQCValues(mu, sigma, angleDeg);
+    }
+
+    // PDF Export
+    document.getElementById('exportBtn')?.addEventListener('click', async ()=>{
+      announce('PDF 내보내기 중입니다.');
+      const main = document.querySelector('.grid');
+      try{
+        const canvas = await html2canvas(main, {scale:2, useCORS:true});
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('sinusitis_snapshot_horizontal.pdf');
+        announce('PDF 저장이 완료되었습니다.');
+      } catch(err){ console.error(err); alert('PDF 내보내기 실패'); announce('PDF 내보내기 실패'); }
+    });
+  </script>
+</body>
+</html>
