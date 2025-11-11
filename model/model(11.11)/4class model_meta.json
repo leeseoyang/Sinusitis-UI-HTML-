@@ -1,0 +1,13 @@
+{
+  "img_size": [
+    96,
+    96
+  ],
+  "channels": 1,
+  "class_names": [
+    "Normal",
+    "Left",
+    "Right",
+    "Both"
+  ]
+}

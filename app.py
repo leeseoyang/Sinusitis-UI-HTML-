@@ -50,30 +50,66 @@ def _load_models_and_classes() -> tuple[Any, Any, list[str], list[str]]:
 
     try:
         from tensorflow import keras  # type: ignore
+        import tensorflow as tf  # type: ignore
         
-        # 8클래스 모델 로딩 (ckpt_best.h5)
+        # TensorFlow 호환성 설정
+        tf.compat.v1.disable_eager_execution = lambda: None  # type: ignore
+        
+        # 8클래스 모델 로딩 (기존 파일 사용 - 호환성 문제로)
         try:
             model_8class = keras.models.load_model('model/ckpt_best.h5', compile=False)  # type: ignore
-            print("✅ 8클래스 모델 (ckpt_best.h5) 로딩 성공")
+            print("✅ 8클래스 모델 (model/ckpt_best.h5) 로딩 성공")
         except Exception as e:
             print(f"❌ 8클래스 모델 로딩 실패: {e}")
             model_8class = None
         
-        # 4클래스 모델 로딩 (LSG_model.h5)
+        # 4클래스 모델 로딩 (여러 파일 시도)
         try:
-            model_4class = keras.models.load_model('model/LSG_model.h5', compile=False)  # type: ignore
-            print("✅ 4클래스 모델 (LSG_model.h5) 로딩 성공")
+            # 첫 번째 시도: 4class model.h5 (더 안정적)
+            model_4class = keras.models.load_model('model/model(11.11)/4class model.h5', compile=False)  # type: ignore
+            print("✅ 4클래스 모델 (model(11.11)/4class model.h5) 로딩 성공")
         except Exception as e:
-            print(f"❌ 4클래스 모델 로딩 실패: {e}")
-            model_4class = None
+            print(f"❌ 4class model.h5 로딩 실패: {e}")
+            try:
+                # 안전한 로딩 방법 시도 (custom_objects 사용)
+                custom_objects = {'Conv2D': tf.keras.layers.Conv2D}  # type: ignore
+                model_4class = keras.models.load_model(  # type: ignore
+                    'model/model(11.11)/4class mata model.h5', 
+                    compile=False,
+                    custom_objects=custom_objects
+                )
+                print("✅ 4클래스 모델 (4class mata model.h5) 커스텀 로딩 성공")
+            except Exception as e2:
+                print(f"❌ 4클래스 모델 로딩 완전 실패 - 호환성 문제: {e2}")
+                print("⚠️ 8클래스 모델만 사용하여 계속 진행합니다.")
+                model_4class = None
         
         # 메타 파일에서 클래스 이름 읽기 (선택적)
         try:
-            with open('model/model_meta.json', 'r', encoding='utf-8') as meta_file:
-                meta = json.load(meta_file)
-            class_names_8 = meta.get('class_names_8', _default_class_names_8)
-            class_names_4 = meta.get('class_names_4', _default_class_names_4)
-        except (FileNotFoundError, json.JSONDecodeError):
+            # 8클래스 모델 메타데이터 로딩
+            with open('model/model(11.11)/8class mata model.json', 'r', encoding='utf-8') as meta_file_8:
+                meta_8 = json.load(meta_file_8)
+            class_names_8 = meta_8.get('class_names', _default_class_names_8)
+            print(f"✅ 8클래스 메타데이터 로딩: {class_names_8}")
+            
+            # 4클래스 모델 메타데이터 로딩
+            with open('model/model(11.11)/4class model_meta.json', 'r', encoding='utf-8') as meta_file_4:
+                meta_4 = json.load(meta_file_4)
+            class_names_4 = meta_4.get('class_names', _default_class_names_4)
+            print(f"✅ 4클래스 메타데이터 로딩: {class_names_4}")
+            
+            # 클래스 수 검증
+            if len(class_names_8) != 8:
+                print(f"⚠️ 8클래스 모델 클래스 수 불일치: {len(class_names_8)}개, 기본값 사용")
+                class_names_8 = _default_class_names_8
+                
+            if len(class_names_4) != 4:
+                print(f"⚠️ 4클래스 모델 클래스 수 불일치: {len(class_names_4)}개, 기본값 사용")
+                class_names_4 = _default_class_names_4
+            
+            print(f"✅ 메타데이터 로딩 성공 - 8클래스: {len(class_names_8)}개, 4클래스: {len(class_names_4)}개")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"⚠️ 메타데이터 로딩 실패, 기본값 사용: {e}")
             class_names_8 = _default_class_names_8
             class_names_4 = _default_class_names_4
             
@@ -136,11 +172,11 @@ def predict():
                                left_score=None, right_score=None, model_type=model_type)
 
     # 전처리 (모델 타입에 따라 채널 수 조정)
-    # 첫 번째 에러에서 8클래스 모델이 1채널을 기대, 4클래스 모델이 3채널을 기대
+    # 메타데이터를 확인하여 채널 수 결정
     if model_type == '4class':
-        channels = 3  # LSG 모델은 3채널
+        channels = 1  # 새로운 4클래스 모델은 1채널 사용
     else:
-        channels = 1  # ckpt_best 모델은 1채널
+        channels = 1  # 8클래스 모델도 1채널 사용
     
     image_for_model, corrected_pil = preprocess_and_correct(image, channels=channels)  # type: ignore
 
@@ -153,39 +189,106 @@ def predict():
         selected_class_names = class_names_8
     
     if selected_model is None:
-        # 모델 미로딩/TF 미설치 상태에서는 입력/전처리만 표시
-        img_byte_arr = io.BytesIO()
-        corrected_pil.save(img_byte_arr, format='PNG')
-        img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-        return render_template('index.html', prediction=None,
-                               class_names_8=class_names_8, class_names_4=class_names_4,
-                               probs=None, image_data=img_base64, boxed_image_data=None, 
-                               left_score=None, right_score=None, model_type=model_type,
-                               error_msg=f'{model_type} 모델을 찾을 수 없습니다.')
+        # 4클래스 모델이 없을 때 8클래스 모델로 대체
+        if model_type == '4class' and model_8class is not None:
+            print("⚠️ 4클래스 모델 미사용 - 8클래스 모델로 대체")
+            selected_model = model_8class
+            selected_class_names = class_names_8
+            model_type = '8class'  # UI에서 표시용
+        else:
+            # 모든 모델이 없는 경우
+            img_byte_arr = io.BytesIO()
+            corrected_pil.save(img_byte_arr, format='PNG')
+            img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+            return render_template('index.html', prediction=None,
+                                   class_names_8=class_names_8, class_names_4=class_names_4,
+                                   probs=None, image_data=img_base64, boxed_image_data=None, 
+                                   left_score=None, right_score=None, model_type=model_type,
+                                   error_msg=f'{model_type} 모델을 찾을 수 없습니다. TensorFlow 호환성 문제가 있을 수 있습니다.')
 
     # 예측 (이미 (96, 96, 1) 형태로 전처리됨)
     preds = selected_model.predict(image_for_model[np.newaxis, ...], batch_size=1)[0]  # type: ignore
     pred_index = int(np.argmax(preds))  # type: ignore
+    
+    # 인덱스 범위 검사 추가
+    if pred_index >= len(selected_class_names):
+        print(f"⚠️ 경고: 예측 인덱스 {pred_index}가 클래스 수 {len(selected_class_names)}를 초과합니다.")
+        print(f"예측 결과 형태: {preds.shape}, 클래스 이름: {selected_class_names}")
+        pred_index = 0  # 안전한 기본값으로 설정
+    
     pred_class = selected_class_names[pred_index]
     confidence = float(np.max(preds) * 100.0)  # type: ignore
+    
+    print(f"🎯 예측 결과: {pred_class} (인덱스: {pred_index}, 신뢰도: {confidence:.1f}%)")
+    print(f"📊 전체 모델 출력값:")
+    for i, (class_name, prob) in enumerate(zip(selected_class_names, preds)):
+        print(f"   {i}: {class_name}: {prob:.3f} ({prob*100:.1f}%)")
+    print(f"🏷️ 사용된 클래스: {selected_class_names}")
 
-    # 박스 기반 자동 추적 오버레이 생성
+    # 박스 기반 자동 추적 오버레이 생성 (Z-score 정규화 포함)
     boxed_base64 = None
     side_scores = {"left": 0.0, "right": 0.0}
     try:
         import cv2
-        from utils.roi import summarize_side_scores, draw_boxes_on_image
+        from utils.roi import summarize_side_scores, draw_boxes_on_image, calculate_roi_statistics, get_sinus_boxes, generate_gradcam_heatmap
 
+        # Z-score 정규화가 적용된 스코어 계산
         side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names)  # type: ignore
-        print(f"🔍 Side scores: {side_scores}")  # 디버깅용
+        print(f"🔍 Side scores (Z-score 포함): {side_scores}")  # 디버깅용
         
-        bgr = cv2.cvtColor(np.array(corrected_pil.convert('L')), cv2.COLOR_GRAY2BGR)
-        boxed_bgr = draw_boxes_on_image(bgr.copy(), side_scores, label=pred_class, conf=confidence)  # type: ignore
+        # ROI 통계 계산 (추가적인 분석용)
+        gray_image = np.array(corrected_pil.convert('L'))
+        boxes = get_sinus_boxes(gray_image.shape[1], gray_image.shape[0])
+        roi_stats = calculate_roi_statistics(gray_image, boxes)
+        print(f"📊 ROI 통계: {roi_stats}")
+        
+        bgr = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2BGR)
+        
+        # GradCAM 히트맵 생성
+        gradcam_heatmap = None
+        active_model = None
+        model_input = None
+        
+        try:
+            # 사용할 모델 결정 (8클래스 또는 4클래스)
+            active_model = model_8class if model_8class is not None else model_4class
+            if active_model is not None:
+                # 모델 입력용 이미지 전처리 (96x96으로 리사이즈 필수!)
+                gray_resized = cv2.resize(gray_image, (96, 96))  # 96x96으로 리사이즈
+                model_input = np.expand_dims(gray_resized / 255.0, axis=-1)  # 정규화 및 채널 추가
+                model_input = np.expand_dims(model_input, axis=0)  # 배치 차원 추가
+                
+                print(f"🔍 GradCAM 생성 중... 모델 입력 형태: {model_input.shape}")
+                gradcam_heatmap = generate_gradcam_heatmap(
+                    model=active_model,
+                    image=model_input, 
+                    class_index=pred_index,
+                    last_conv_layer=None  # 자동 감지
+                )
+                print(f"✅ GradCAM 히트맵 생성 완료: {gradcam_heatmap.shape}")
+            else:
+                print("⚠️ 사용할 수 있는 모델이 없어 GradCAM 생략")
+                gradcam_heatmap = None
+        except Exception as e:
+            print(f"❌ GradCAM 생성 실패: {e}")
+            gradcam_heatmap = None
+        
+        # Z-score가 적용된 이미지 생성 (GradCAM 포함)
+        boxed_bgr = draw_boxes_on_image(
+            bgr.copy(), 
+            side_scores, 
+            label=pred_class, 
+            conf=confidence,
+            gradcam_heatmap=gradcam_heatmap,  # GradCAM 히트맵 전달
+            model=active_model,  # 모델 전달
+            processed_image=model_input,
+            pred_index=pred_index
+        )  # type: ignore
 
         buf2 = io.BytesIO()
         img_rgb = cv2.cvtColor(boxed_bgr, cv2.COLOR_BGR2RGB)  # type: ignore
         
-        # 이미지 크기 최적화 (품질을 약간 낮춰서 크기 줄이기)
+        # 이미지 크기 최적화
         pil_img = Image.fromarray(img_rgb)  # type: ignore
         pil_img.save(buf2, format='PNG', optimize=True, compress_level=6)
         
@@ -242,7 +345,7 @@ def ai_chat():
     
     # 세션이나 전역변수에서 최근 진단 결과를 가져와야 하지만,
     # 간단한 구현을 위해 요청 데이터에서 가져오기
-    diagnosis_data = data.get('diagnosisData', {}) if data else {}
+    diagnosis_data = data.get('diagnosisData', {}) if data else {} # type: ignore
     
     # 디버깅: 받은 데이터 출력
     print(f"🤖 AI 상담 요청 받음:")

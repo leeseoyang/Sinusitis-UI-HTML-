@@ -1,0 +1,17 @@
+{
+  "img_size": [
+    96,
+    96
+  ],
+  "channels": 1,
+  "class_names": [
+    "Normal",
+    "Left-Mucosal",
+    "Left-Air fluid",
+    "Left-Haziness",
+    "Right-Mucosal",
+    "Right-Air fluid",
+    "Right-Haziness",
+    "Both"
+  ]
+}
