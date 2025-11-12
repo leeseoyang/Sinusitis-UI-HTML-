@@ -236,17 +236,22 @@ def predict():
         side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names)  # type: ignore
         print(f"🔍 ROI 스마트 재분류 결과: {side_scores}")  # 디버깅용
         
-        # 🎯 핵심: ROI 재분류 결과를 최종 출력에 반영
+        # 🎯 핵심: ROI 재분류 결과를 최종 출력에 반영 (더 보수적 임계값 적용)
         if side_scores.get('corrected', False):  # 재분류가 적용된 경우
             left_score = side_scores.get('left', 0.0)
             right_score = side_scores.get('right', 0.0)
             both_score = side_scores.get('both', 0.0)
             normal_score = side_scores.get('normal', 0.0)
             
-            # 최고 점수를 가진 항목으로 최종 진단 결정
+            # 최고 점수를 가진 항목으로 최종 진단 결정 (더 보수적 임계값)
             max_score = max(left_score, right_score, both_score, normal_score)
             
-            if max_score == left_score and left_score > 0.3:
+            # ⚠️ Normal이 여전히 높은 경우 재분류 취소 (70% 이상)
+            if normal_score > 0.7:
+                print(f"⚠️ Normal 점수가 여전히 높음 ({normal_score:.3f}) - 재분류 취소")
+                pred_class = f"Normal (재분류 검토됨, {normal_score*100:.1f}%)"
+                confidence = normal_score * 100
+            elif max_score == left_score and left_score > 0.4:  # 임계값 상향: 0.3 → 0.4
                 # 좌측으로 재분류
                 if both_score > 0.2:  # 원래 Both였던 경우
                     pred_class = "Left-Dominant (재분류됨)"
@@ -262,7 +267,7 @@ def predict():
                             confidence = left_score * 100
                             break
             
-            elif max_score == right_score and right_score > 0.3:
+            elif max_score == right_score and right_score > 0.4:  # 임계값 상향: 0.3 → 0.4
                 # 우측으로 재분류
                 if both_score > 0.2:  # 원래 Both였던 경우
                     pred_class = "Right-Dominant (재분류됨)"
@@ -277,6 +282,10 @@ def predict():
                             pred_class = name + " (스마트 강화)"
                             confidence = right_score * 100
                             break
+            else:
+                # 재분류 점수가 부족한 경우 원본 유지
+                print(f"ℹ️ 재분류 점수 부족 - 원본 유지: 최대점수 {max_score:.3f} < 0.4")
+                pred_class = f"{pred_class} (재분류 미적용)"
             
             print(f"✅ ROI 재분류 최종 결과: {pred_class} (신뢰도: {confidence:.1f}%)")
             print(f"   좌측: {left_score:.3f}, 우측: {right_score:.3f}, Both: {both_score:.3f}")

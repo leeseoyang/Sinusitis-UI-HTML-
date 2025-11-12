@@ -254,10 +254,10 @@ def summarize_side_scores(preds: Any, class_names: Any) -> Dict[str, float]:  # 
             both_total *= 0.3
         corrected = True
     
-    # 시나리오 2: Normal이 높지만 실제 병변이 감지될 때
+    # 시나리오 2: Normal이 높지만 실제 병변이 감지될 때 (임계값 상향 조정)
     pathology_score = left + right + both_total  # 병변 총합
-    normal_threshold = 0.5  # Normal 임계값
-    pathology_threshold = 0.15  # 병변 임계값 (15% 이상)
+    normal_threshold = 0.7  # Normal 임계값 상향: 0.5 → 0.7 (70% 이상일 때만 Normal 유지)
+    pathology_threshold = 0.25  # 병변 임계값 상향: 0.15 → 0.25 (25% 이상)
     
     # 시나리오 3: ROI 통계 기반 현실적 재분류 (NEW!)
     # ROI 통계에서 실제 혼탁도를 확인하여 재분류
@@ -288,24 +288,32 @@ def summarize_side_scores(preds: Any, class_names: Any) -> Dict[str, float]:  # 
     except:
         pass  # ROI 통계 분석 실패 시 무시
     
-    if normal > normal_threshold and pathology_score > pathology_threshold:
+    # Normal→병변 재분류 조건을 더 엄격하게 수정
+    if normal > normal_threshold and pathology_score > pathology_threshold and normal < 0.8:  # 80% 이하일 때만
         print(f"🔄 Normal→병변 재분류 적용: Normal {normal:.3f}, 병변총합 {pathology_score:.3f}")
+        print(f"   ⚠️ Normal이 {normal_threshold*100}% 이상이지만 병변 신호가 {pathology_threshold*100}% 이상 감지됨")
         
-        # 병변 중에서 가장 높은 점수를 가진 쪽에 Normal 점수의 일부 재분배
-        if left > right and left > both_total:
-            print(f"   -> 좌측 병변 강화 (Left-Air fluid, Mucosal 등)")
-            left += normal * 0.4  # Normal 점수의 40%를 좌측으로
-            normal *= 0.6
-        elif right > left and right > both_total:
-            print(f"   -> 우측 병변 강화")
-            right += normal * 0.4  # Normal 점수의 40%를 우측으로
-            normal *= 0.6
-        elif both_total > left and both_total > right:
-            print(f"   -> 양측 병변 강화")
-            both_total += normal * 0.4
-            normal *= 0.6
+        # 병변 중에서 가장 높은 점수를 가진 쪽에 Normal 점수의 일부만 재분배 (더 보수적으로)
+        redistribution_ratio = 0.2  # 40% → 20%로 감소 (더 보수적)
+        
+        if left > right and left > both_total and left > 0.1:  # 좌측 병변이 10% 이상일 때만
+            print(f"   -> 좌측 병변 약간 강화 (redistribution: {redistribution_ratio*100}%)")
+            left += normal * redistribution_ratio
+            normal *= (1 - redistribution_ratio)
+        elif right > left and right > both_total and right > 0.1:  # 우측 병변이 10% 이상일 때만
+            print(f"   -> 우측 병변 약간 강화")
+            right += normal * redistribution_ratio
+            normal *= (1 - redistribution_ratio)
+        elif both_total > left and both_total > right and both_total > 0.1:
+            print(f"   -> 양측 병변 약간 강화")
+            both_total += normal * redistribution_ratio
+            normal *= (1 - redistribution_ratio)
+        else:
+            print("   -> 병변 신호가 너무 약해 재분류 취소")
+            # 재분류하지 않음
+            pass
             
-        # 재분류 플래그 설정
+        # 재분류 플래그 설정 (실제 재분배가 일어났을 때만)
         corrected = True
     elif both_total > 0.5:  # Both로 예측되었지만 재분류되지 않은 경우도 체크
         corrected = True
