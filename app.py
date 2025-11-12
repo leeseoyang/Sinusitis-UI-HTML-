@@ -270,11 +270,66 @@ def predict():
             side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names, roi_stats)  # type: ignore
             print(f"🔍 ROI 스마트 재분류 결과: {side_scores}")  # 디버깅용
         else:
-            # 4분류 모델: 간단한 Both 재분류 로직 적용
-            print("📊 4분류 모델: 간단한 Both 재분류 로직 적용")
+            # 4분류 모델: ROI 기반 좌우 검증 적용
+            roi_stats = calculate_roi_statistics(gray_image, boxes)
+            print("📊 4분류 모델: ROI 기반 좌우 검증 적용")
             
-            # Both가 가장 높지만 Left나 Right와 차이가 적은 경우 재분류
-            if pred_index == 3:  # Both로 예측된 경우
+            # ROI 통계로 실제 좌우 병변 확인
+            left_stats = roi_stats.get('left', {})
+            right_stats = roi_stats.get('right', {})
+            left_opacity = left_stats.get('opacity_ratio', 0.25)
+            right_opacity = right_stats.get('opacity_ratio', 0.25)
+            left_mean = left_stats.get('mean', 128)
+            right_mean = right_stats.get('mean', 128)
+            
+            # ROI 기반 병변 점수 계산
+            roi_left_score = left_opacity + max(0, (130 - left_mean) / 100)
+            roi_right_score = right_opacity + max(0, (130 - right_mean) / 100)
+            
+            print(f"📊 ROI 점수: 좌측 {roi_left_score:.3f}, 우측 {roi_right_score:.3f}")
+            
+            # 원본 예측 저장
+            original_pred_index = pred_index
+            
+            # Left/Right 예측이 ROI와 반대인 경우 수정
+            if pred_index == 2 and roi_left_score > roi_right_score + 0.15:  # Right인데 ROI는 Left
+                print(f"⚠️ Right→Left 수정: ROI 좌측 우세 ({roi_left_score:.3f} vs {roi_right_score:.3f})")
+                pred_index = 1
+                pred_class = "Left"
+                confidence = max(float(preds[1]) * 100, 25.0)
+            
+            # Both로 예측된 경우 ROI 통계 우선 재분류
+            elif pred_index == 3:  # Both로 예측된 경우
+                both_score = float(preds[3])
+                left_score = float(preds[1]) 
+                right_score = float(preds[2])
+                
+                print(f"🔄 Both 재분류 분석: Both {both_score:.3f}, Left {left_score:.3f}, Right {right_score:.3f}")
+                
+                # ROI 통계 우선 적용 - 좌우 차이가 10% 이상이면 ROI 기준으로
+                if abs(roi_left_score - roi_right_score) > 0.1:
+                    if roi_left_score > roi_right_score:
+                        print(f"🔄 ROI 기반 Both→Left: 좌측 ROI 우세 ({roi_left_score:.3f} vs {roi_right_score:.3f})")
+                        pred_index = 1
+                        pred_class = "Left"
+                        confidence = max((both_score + left_score) * 50, 30.0)
+                    else:
+                        print(f"🔄 ROI 기반 Both→Right: 우측 ROI 우세 ({roi_right_score:.3f} vs {roi_left_score:.3f})")
+                        pred_index = 2
+                        pred_class = "Right"
+                        confidence = max((both_score + right_score) * 50, 30.0)
+                else:
+                    # ROI가 애매한 경우 예측 점수 비교
+                    if left_score > right_score:
+                        print(f"🔄 점수 기반 Both→Left: Left {left_score:.3f} > Right {right_score:.3f}")
+                        pred_index = 1
+                        pred_class = "Left"
+                        confidence = (both_score + left_score) * 50
+                    else:
+                        print(f"🔄 점수 기반 Both→Right: Right {right_score:.3f} ≥ Left {left_score:.3f}")
+                        pred_index = 2
+                        pred_class = "Right" 
+                        confidence = (both_score + right_score) * 50
                 both_score = float(preds[3])
                 left_score = float(preds[1]) 
                 right_score = float(preds[2])
