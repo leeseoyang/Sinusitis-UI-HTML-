@@ -241,8 +241,8 @@ def summarize_side_scores(preds: np.ndarray, class_names: list[str], roi_stats: 
     left_right_ratio = abs(left - right) / max(left + right, 0.001)  # 좌우 차이 비율
     corrected = False  # 재분류 플래그 초기화
     
-    # 시나리오 1: 좌우 차이가 클 때 "Both" 판정을 수정
-    if left_right_ratio > 0.5 and both_total > 0.5:
+    # 시나리오 1: 좌우 차이가 클 때 "Both" 판정을 수정 (임계값 완화)
+    if left_right_ratio > 0.3 and both_total > 0.3:  # 임계값 완화: 0.5 → 0.3
         print(f"🔄 스마트 재분류 적용: 좌우 차이 비율 {left_right_ratio:.2f}")
         if left > right:
             print(f"   -> 좌측 우세로 재분류 (좌측: {left:.3f}, 우측: {right:.3f})")

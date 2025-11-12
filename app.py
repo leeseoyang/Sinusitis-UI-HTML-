@@ -173,11 +173,23 @@ def predict():
                                left_score=None, right_score=None, model_type=model_type)
 
     # 전처리 (모델 타입에 따라 채널 수 조정)
-    # 메타데이터를 확인하여 채널 수 결정
-    if model_type == '4class':
-        channels = 1  # 새로운 4클래스 모델은 1채널 사용
+    # 모델의 입력 형태를 확인하여 채널 수 동적 결정
+    if model_type == '4class' and model_4class is not None:
+        try:
+            # 모델의 입력 형태 확인
+            input_shape = model_4class.input_shape
+            print(f"🔍 4클래스 모델 입력 형태: {input_shape}")
+            if len(input_shape) >= 4 and input_shape[-1] == 3:
+                channels = 3  # 3채널 입력
+                print("📊 4클래스 모델: 3채널 RGB 입력 감지")
+            else:
+                channels = 1  # 1채널 입력
+                print("📊 4클래스 모델: 1채널 그레이스케일 입력 감지")
+        except Exception as e:
+            print(f"⚠️ 모델 입력 형태 확인 실패: {e}, 기본값 3채널 사용")
+            channels = 3  # 기본값으로 3채널 사용
     else:
-        channels = 1  # 8클래스 모델도 1채널 사용
+        channels = 1  # 8클래스 모델은 1채널 사용
     
     image_for_model, corrected_pil = preprocess_and_correct(image, channels=channels)  # type: ignore
 
@@ -209,6 +221,19 @@ def predict():
 
     # 예측 (이미 (96, 96, 1) 형태로 전처리됨)
     preds = selected_model.predict(image_for_model[np.newaxis, ...], batch_size=1)[0]  # type: ignore
+    
+    # 4분류 모델이 8개 출력을 가지는 경우 매핑 처리
+    if model_type == '4class' and len(preds) == 8:
+        print(f"🔄 4분류 모델 8→4 매핑 적용: {preds.shape}")
+        # 8클래스를 4클래스로 매핑: [Normal, Left, Right, Both]
+        mapped_preds = np.zeros(4)
+        mapped_preds[0] = preds[0]  # Normal
+        mapped_preds[1] = preds[1] + preds[2] + preds[3]  # Left (Mucosal + Air fluid + Haziness)
+        mapped_preds[2] = preds[4] + preds[5] + preds[6]  # Right (Mucosal + Air fluid + Haziness)
+        mapped_preds[3] = preds[7]  # Both
+        preds = mapped_preds
+        print(f"✅ 4분류 매핑 완료: {preds}")
+    
     pred_index = int(np.argmax(preds))  # type: ignore
     
     # 인덱스 범위 검사 추가
@@ -233,15 +258,42 @@ def predict():
         import cv2
         from utils.roi import summarize_side_scores, draw_boxes_on_image, calculate_roi_statistics, get_sinus_boxes, generate_gradcam_heatmap
 
-        # ROI 통계 계산 먼저 (summarize_side_scores에서 사용)
+        # ROI 통계 계산 먼저 (8클래스 모델에서만)
         gray_image = np.array(corrected_pil.convert('L'))
         boxes = get_sinus_boxes(gray_image.shape[1], gray_image.shape[0])
-        roi_stats = calculate_roi_statistics(gray_image, boxes)
-        print(f"📊 ROI 통계: {roi_stats}")
+        
+        if model_type == '8class':
+            roi_stats = calculate_roi_statistics(gray_image, boxes)
+            print(f"📊 ROI 통계: {roi_stats}")
 
-        # Z-score 정규화가 적용된 스코어 계산 (ROI 통계 전달)
-        side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names, roi_stats)  # type: ignore
-        print(f"🔍 ROI 스마트 재분류 결과: {side_scores}")  # 디버깅용
+            # Z-score 정규화가 적용된 스코어 계산 (ROI 통계 전달)
+            side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names, roi_stats)  # type: ignore
+            print(f"🔍 ROI 스마트 재분류 결과: {side_scores}")  # 디버깅용
+        else:
+            # 4분류 모델: 간단한 Both 재분류 로직 적용
+            print("📊 4분류 모델: 간단한 Both 재분류 로직 적용")
+            
+            # Both가 가장 높지만 Left나 Right와 차이가 적은 경우 재분류
+            if pred_index == 3:  # Both로 예측된 경우
+                both_score = float(preds[3])
+                left_score = float(preds[1]) 
+                right_score = float(preds[2])
+                
+                # Both와 Left/Right 차이가 20% 미만이면 더 높은 쪽으로 재분류
+                if abs(both_score - left_score) < 0.2 or abs(both_score - right_score) < 0.2:
+                    if left_score > right_score:
+                        print(f"� 4분류 Both→Left 재분류: Both {both_score:.3f}, Left {left_score:.3f}")
+                        pred_index = 1
+                        pred_class = "Left"
+                        confidence = (both_score + left_score) * 50  # 합산 신뢰도
+                    else:
+                        print(f"🔄 4분류 Both→Right 재분류: Both {both_score:.3f}, Right {right_score:.3f}")
+                        pred_index = 2
+                        pred_class = "Right" 
+                        confidence = (both_score + right_score) * 50  # 합산 신뢰도
+            
+            side_scores = {'corrected': True if pred_index != int(np.argmax(preds)) else False}
+            roi_stats = None
         
         # 🎯 핵심: ROI 재분류 결과를 최종 출력에 반영 (더 보수적 임계값 적용)
         if side_scores.get('corrected', False):  # 재분류가 적용된 경우
