@@ -258,36 +258,74 @@ def predict():
                 pred_class = f"Normal (재분류 검토됨, {normal_score*100:.1f}%)"
                 confidence = normal_score * 100
             elif max_score == left_score and left_score > 0.4:  # 임계값 상향: 0.3 → 0.4
-                # 좌측으로 재분류
+                # 좌측으로 재분류 (혼탁 우선 로직)
                 if both_score > 0.2:  # 원래 Both였던 경우
-                    pred_class = "Left-Dominant (재분류됨)"
+                    pred_class = "Left-Haziness (재분류됨)"  # 혼탁으로 우선 분류
                     confidence = left_score * 100
                 elif normal_score > 0.2:  # 원래 Normal이었던 경우
-                    pred_class = "Left-Pathology (재분류됨)"
+                    pred_class = "Left-Haziness (재분류됨)"  # 혼탁으로 우선 분류
                     confidence = left_score * 100
                 else:
-                    # 원래 좌측 진단을 강화
+                    # 혼탁 우선 선택: Haziness > Air fluid > Mucosal 순서
+                    haziness_found = False
                     for name in selected_class_names:
-                        if name.lower().startswith('left-'):
-                            pred_class = name + " (스마트 강화)"
+                        if name.lower().startswith('left-haziness'):
+                            pred_class = name + " (혼탁 우선)"
                             confidence = left_score * 100
+                            haziness_found = True
                             break
+                    
+                    if not haziness_found:
+                        # Haziness가 없으면 Air fluid 우선
+                        for name in selected_class_names:
+                            if name.lower().startswith('left-air'):
+                                pred_class = name + " (스마트 강화)"
+                                confidence = left_score * 100
+                                haziness_found = True
+                                break
+                    
+                    if not haziness_found:
+                        # 마지막으로 Mucosal
+                        for name in selected_class_names:
+                            if name.lower().startswith('left-'):
+                                pred_class = name + " (스마트 강화)"
+                                confidence = left_score * 100
+                                break
             
             elif max_score == right_score and right_score > 0.4:  # 임계값 상향: 0.3 → 0.4
-                # 우측으로 재분류
+                # 우측으로 재분류 (혼탁 우선 로직)
                 if both_score > 0.2:  # 원래 Both였던 경우
-                    pred_class = "Right-Dominant (재분류됨)"
+                    pred_class = "Right-Haziness (재분류됨)"  # 혼탁으로 우선 분류
                     confidence = right_score * 100
                 elif normal_score > 0.2:  # 원래 Normal이었던 경우
-                    pred_class = "Right-Pathology (재분류됨)"
+                    pred_class = "Right-Haziness (재분류됨)"  # 혼탁으로 우선 분류
                     confidence = right_score * 100
                 else:
-                    # 원래 우측 진단을 강화
+                    # 혼탁 우선 선택: Haziness > Air fluid > Mucosal 순서
+                    haziness_found = False
                     for name in selected_class_names:
-                        if name.lower().startswith('right-'):
-                            pred_class = name + " (스마트 강화)"
+                        if name.lower().startswith('right-haziness'):
+                            pred_class = name + " (혼탁 우선)"
                             confidence = right_score * 100
+                            haziness_found = True
                             break
+                    
+                    if not haziness_found:
+                        # Haziness가 없으면 Air fluid 우선
+                        for name in selected_class_names:
+                            if name.lower().startswith('right-air'):
+                                pred_class = name + " (스마트 강화)"
+                                confidence = right_score * 100
+                                haziness_found = True
+                                break
+                    
+                    if not haziness_found:
+                        # 마지막으로 Mucosal
+                        for name in selected_class_names:
+                            if name.lower().startswith('right-'):
+                                pred_class = name + " (스마트 강화)"
+                                confidence = right_score * 100
+                                break
             else:
                 # 재분류 점수가 부족한 경우 원본 유지
                 print(f"ℹ️ 재분류 점수 부족 - 원본 유지: 최대점수 {max_score:.3f} < 0.4")
