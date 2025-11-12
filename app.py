@@ -219,7 +219,7 @@ def predict():
     pred_class = selected_class_names[pred_index]
     confidence = float(np.max(preds) * 100.0)  # type: ignore
     
-    print(f"🎯 예측 결과: {pred_class} (인덱스: {pred_index}, 신뢰도: {confidence:.1f}%)")
+    print(f"🎯 모델 원본 예측: {pred_class} (인덱스: {pred_index}, 신뢰도: {confidence:.1f}%)")
     print(f"📊 전체 모델 출력값:")
     for i, (class_name, prob) in enumerate(zip(selected_class_names, preds)):
         print(f"   {i}: {class_name}: {prob:.3f} ({prob*100:.1f}%)")
@@ -234,7 +234,54 @@ def predict():
 
         # Z-score 정규화가 적용된 스코어 계산
         side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names)  # type: ignore
-        print(f"🔍 Side scores (Z-score 포함): {side_scores}")  # 디버깅용
+        print(f"🔍 ROI 스마트 재분류 결과: {side_scores}")  # 디버깅용
+        
+        # 🎯 핵심: ROI 재분류 결과를 최종 출력에 반영
+        if side_scores.get('corrected', False):  # 재분류가 적용된 경우
+            left_score = side_scores.get('left', 0.0)
+            right_score = side_scores.get('right', 0.0)
+            both_score = side_scores.get('both', 0.0)
+            normal_score = side_scores.get('normal', 0.0)
+            
+            # 최고 점수를 가진 항목으로 최종 진단 결정
+            max_score = max(left_score, right_score, both_score, normal_score)
+            
+            if max_score == left_score and left_score > 0.3:
+                # 좌측으로 재분류
+                if both_score > 0.2:  # 원래 Both였던 경우
+                    pred_class = "Left-Dominant (재분류됨)"
+                    confidence = left_score * 100
+                elif normal_score > 0.2:  # 원래 Normal이었던 경우
+                    pred_class = "Left-Pathology (재분류됨)"
+                    confidence = left_score * 100
+                else:
+                    # 원래 좌측 진단을 강화
+                    for name in selected_class_names:
+                        if name.lower().startswith('left-'):
+                            pred_class = name + " (스마트 강화)"
+                            confidence = left_score * 100
+                            break
+            
+            elif max_score == right_score and right_score > 0.3:
+                # 우측으로 재분류
+                if both_score > 0.2:  # 원래 Both였던 경우
+                    pred_class = "Right-Dominant (재분류됨)"
+                    confidence = right_score * 100
+                elif normal_score > 0.2:  # 원래 Normal이었던 경우
+                    pred_class = "Right-Pathology (재분류됨)"
+                    confidence = right_score * 100
+                else:
+                    # 원래 우측 진단을 강화
+                    for name in selected_class_names:
+                        if name.lower().startswith('right-'):
+                            pred_class = name + " (스마트 강화)"
+                            confidence = right_score * 100
+                            break
+            
+            print(f"✅ ROI 재분류 최종 결과: {pred_class} (신뢰도: {confidence:.1f}%)")
+            print(f"   좌측: {left_score:.3f}, 우측: {right_score:.3f}, Both: {both_score:.3f}")
+        else:
+            print(f"ℹ️ ROI 재분류 미적용 - 원본 예측값 사용: {pred_class}")
         
         # ROI 통계 계산 (추가적인 분석용)
         gray_image = np.array(corrected_pil.convert('L'))
