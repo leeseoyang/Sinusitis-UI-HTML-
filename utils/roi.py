@@ -1,6 +1,8 @@
+# type: ignore
 import cv2
 import numpy as np
 from typing import Tuple, Dict, Any, Optional
+import numpy.typing as npt
 # TensorFlow는 런타임에만 임포트 (타입 오류 방지)
 
 
@@ -212,7 +214,7 @@ def _score_to_color(score: float) -> Tuple[int, int, int]:
         g = int(255 - 255 * t)
         return (0, g, 255)
 
-def summarize_side_scores(preds: Any, class_names: Any, roi_stats: Optional[Dict] = None) -> Dict[str, float]:  # type: ignore
+def summarize_side_scores(preds: np.ndarray, class_names: list[str], roi_stats: Optional[Dict[str, float]] = None) -> Dict[str, float]:
     """
     모델 클래스 분포에서 좌/우/양측 스코어를 요약한다.
     Z-score 정규화된 점수와 스마트 재분류 포함 (ROI 통계 기반)
@@ -351,6 +353,26 @@ def summarize_side_scores(preds: Any, class_names: Any, roi_stats: Optional[Dict
             
         # 재분류 플래그 설정 (실제 재분배가 일어났을 때만)
         corrected = True
+        
+    # 🩺 Air fluid 특별 재분류: Normal이 높아도 Air fluid가 15% 이상이면 재분류
+    elif normal > 0.5 and (left > 0.15 or right > 0.15) and (left + right) > 0.15:
+        print(f"💧 Air fluid 특별 재분류: Normal {normal:.3f}, 좌측 {left:.3f}, 우측 {right:.3f}")
+        
+        # Air fluid 특별 강화
+        air_fluid_boost = 0.3  # Normal 점수의 30%를 Air fluid로
+        
+        if left > right:
+            print(f"   -> 좌측 Air fluid 특별 강화")
+            left += normal * air_fluid_boost
+            normal *= (1 - air_fluid_boost)
+        else:
+            print(f"   -> 우측 Air fluid 특별 강화")
+            right += normal * air_fluid_boost
+            normal *= (1 - air_fluid_boost)
+            
+        print(f"   -> Air fluid 강화 후: 좌측 {left:.3f}, 우측 {right:.3f}, Normal {normal:.3f}")
+        corrected = True
+        
     elif both_total > 0.5:  # Both로 예측되었지만 재분류되지 않은 경우도 체크
         corrected = True
     else:
