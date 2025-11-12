@@ -212,10 +212,10 @@ def _score_to_color(score: float) -> Tuple[int, int, int]:
         g = int(255 - 255 * t)
         return (0, g, 255)
 
-def summarize_side_scores(preds: Any, class_names: Any) -> Dict[str, float]:  # type: ignore
+def summarize_side_scores(preds: Any, class_names: Any, roi_stats: Optional[Dict] = None) -> Dict[str, float]:  # type: ignore
     """
     모델 클래스 분포에서 좌/우/양측 스코어를 요약한다.
-    Z-score 정규화된 점수와 스마트 재분류 포함
+    Z-score 정규화된 점수와 스마트 재분류 포함 (ROI 통계 기반)
     """
     idx = {name: i for i, name in enumerate(class_names)}  # type: ignore
     get = lambda name: float(preds[idx[name]]) if name in idx else 0.0  # type: ignore
@@ -259,33 +259,69 @@ def summarize_side_scores(preds: Any, class_names: Any) -> Dict[str, float]:  # 
     normal_threshold = 0.7  # Normal 임계값 상향: 0.5 → 0.7 (70% 이상일 때만 Normal 유지)
     pathology_threshold = 0.25  # 병변 임계값 상향: 0.15 → 0.25 (25% 이상)
     
-    # 시나리오 3: ROI 통계 기반 현실적 재분류 (NEW!)
+    # 시나리오 3: ROI 통계 기반 현실적 재분류 (ROI 통계 활용!)
     # ROI 통계에서 실제 혼탁도를 확인하여 재분류
     try:
-        # ROI 통계 데이터가 있는 경우 분석
-        if hasattr(preds, 'roi_stats') or 'roi_stats' in locals():  # type: ignore
-            pass  # ROI 통계는 별도로 처리됨
-        
         # 실제 좌우 병변 비율이 모델 예측과 반대인 경우 보정
-        if both_total > 0.5:  # Both로 예측된 경우
-            # 좌우 개별 점수가 매우 낮은 경우 (5% 이하) 재분배
-            if left < 0.15 and right < 0.15:  # 임계값을 15%로 상향 조정
+        if both_total > 0.5 and roi_stats is not None:  # Both로 예측된 경우 + ROI 통계 있음
+            # 좌우 개별 점수가 매우 낮은 경우 (15% 이하) 재분배
+            if left < 0.15 and right < 0.15:
                 print("🔄 Both 세부분류 재분석: 좌우 개별 점수 매우 낮음")
+                print(f"   -> Both 점수 {both_total:.3f}를 ROI 통계 기반으로 재분배")
                 
-                # ✨ 핵심: 실제 우측이 더 심한지 좌측이 더 심한지 판단
-                # (로그 상 right mean > left mean 이면 우측이 더 심함)
-                print(f"   -> Both 점수 {both_total:.3f}를 실제 병변 위치로 재분배")
+                # ✨ 핵심: ROI 통계를 실제로 활용한 재분류
+                left_stats = getattr(roi_stats, 'get', lambda x, d: d)('left', {})  # type: ignore
+                right_stats = getattr(roi_stats, 'get', lambda x, d: d)('right', {})  # type: ignore
                 
-                # Both 점수의 대부분을 우측으로 재분배 (로그 상 right mean이 더 높음)
-                # 향후: ROI 통계 연동으로 자동화 가능
-                right += both_total * 0.75  # 75%를 우측으로
-                left += both_total * 0.25   # 25%를 좌측으로
+                # 혼탁도 지표들 추출
+                left_opacity = float(getattr(left_stats, 'get', lambda x, d: d)('opacity_ratio', 0.25))  # type: ignore
+                right_opacity = float(getattr(right_stats, 'get', lambda x, d: d)('opacity_ratio', 0.25))  # type: ignore
+                left_mean = float(getattr(left_stats, 'get', lambda x, d: d)('mean', 128))  # type: ignore
+                right_mean = float(getattr(right_stats, 'get', lambda x, d: d)('mean', 128))  # type: ignore
+                left_outlier = float(getattr(left_stats, 'get', lambda x, d: d)('outlier_ratio', 0.1))  # type: ignore
+                right_outlier = float(getattr(right_stats, 'get', lambda x, d: d)('outlier_ratio', 0.1))  # type: ignore
+                
+                print(f"   📊 ROI 분석:")
+                print(f"      좌측: 혼탁도 {left_opacity:.3f}, 평균밝기 {left_mean:.1f}, 이상치 {left_outlier:.3f}")
+                print(f"      우측: 혼탁도 {right_opacity:.3f}, 평균밝기 {right_mean:.1f}, 이상치 {right_outlier:.3f}")
+                
+                # 종합 혼탁도 점수 계산 (낮을수록 더 혼탁)
+                left_opacity_score = left_opacity + (1 - left_mean/255) + left_outlier  # 혼탁도 종합
+                right_opacity_score = right_opacity + (1 - right_mean/255) + right_outlier
+                
+                print(f"   � 종합 혼탁도 점수: 좌측 {left_opacity_score:.3f}, 우측 {right_opacity_score:.3f}")
+                
+                # ROI 통계 기반 재분배 (혼탁도가 높은 쪽으로 더 많이)
+                if left_opacity_score > right_opacity_score:
+                    # 좌측이 더 혼탁함
+                    ratio_diff = left_opacity_score / (left_opacity_score + right_opacity_score)
+                    left_ratio = max(0.6, ratio_diff)  # 최소 60%
+                    right_ratio = 1 - left_ratio
+                    print(f"   -> 좌측이 더 혼탁함: 좌측 {left_ratio:.1%}, 우측 {right_ratio:.1%}")
+                else:
+                    # 우측이 더 혼탁함
+                    ratio_diff = right_opacity_score / (left_opacity_score + right_opacity_score)
+                    right_ratio = max(0.6, ratio_diff)  # 최소 60%
+                    left_ratio = 1 - right_ratio
+                    print(f"   -> 우측이 더 혼탁함: 우측 {right_ratio:.1%}, 좌측 {left_ratio:.1%}")
+                
+                # Both 점수를 실제 혼탁도에 기반해서 재분배
+                left += both_total * left_ratio
+                right += both_total * right_ratio
                 both_total *= 0.1  # Both는 10%만 유지
                 
-                print(f"   -> 재분배 후: 좌측 {left:.3f}, 우측 {right:.3f}, Both {both_total:.3f}")
-                print("   🎯 우측이 더 심한 것으로 재분류")
+                print(f"   -> ROI 기반 재분배 후: 좌측 {left:.3f}, 우측 {right:.3f}, Both {both_total:.3f}")
+                print(f"   🎯 {'좌측' if left > right else '우측'}이 더 심한 것으로 ROI 분석 결과 재분류")
                 corrected = True
-    except:
+        elif both_total > 0.5:  # ROI 통계가 없는 경우 기존 로직
+            if left < 0.15 and right < 0.15:
+                print("🔄 Both 세부분류 재분석: ROI 통계 없이 기본 재분배")
+                right += both_total * 0.75  # 기본값
+                left += both_total * 0.25
+                both_total *= 0.1
+                corrected = True
+    except Exception as e:
+        print(f"⚠️ ROI 통계 분석 중 오류: {e}")
         pass  # ROI 통계 분석 실패 시 무시
     
     # Normal→병변 재분류 조건을 더 엄격하게 수정

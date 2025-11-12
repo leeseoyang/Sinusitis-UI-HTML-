@@ -232,8 +232,14 @@ def predict():
         import cv2
         from utils.roi import summarize_side_scores, draw_boxes_on_image, calculate_roi_statistics, get_sinus_boxes, generate_gradcam_heatmap
 
-        # Z-score 정규화가 적용된 스코어 계산
-        side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names)  # type: ignore
+        # ROI 통계 계산 먼저 (summarize_side_scores에서 사용)
+        gray_image = np.array(corrected_pil.convert('L'))
+        boxes = get_sinus_boxes(gray_image.shape[1], gray_image.shape[0])
+        roi_stats = calculate_roi_statistics(gray_image, boxes)
+        print(f"📊 ROI 통계: {roi_stats}")
+
+        # Z-score 정규화가 적용된 스코어 계산 (ROI 통계 전달)
+        side_scores: Dict[str, float] = summarize_side_scores(preds, selected_class_names, roi_stats)  # type: ignore
         print(f"🔍 ROI 스마트 재분류 결과: {side_scores}")  # 디버깅용
         
         # 🎯 핵심: ROI 재분류 결과를 최종 출력에 반영 (더 보수적 임계값 적용)
@@ -291,12 +297,6 @@ def predict():
             print(f"   좌측: {left_score:.3f}, 우측: {right_score:.3f}, Both: {both_score:.3f}")
         else:
             print(f"ℹ️ ROI 재분류 미적용 - 원본 예측값 사용: {pred_class}")
-        
-        # ROI 통계 계산 (추가적인 분석용)
-        gray_image = np.array(corrected_pil.convert('L'))
-        boxes = get_sinus_boxes(gray_image.shape[1], gray_image.shape[0])
-        roi_stats = calculate_roi_statistics(gray_image, boxes)
-        print(f"📊 ROI 통계: {roi_stats}")
         
         bgr = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2BGR)
         
