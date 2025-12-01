@@ -218,6 +218,19 @@
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 20px; margin-top: 16px;
     }
+    /* 결과 하단(ROI + 확률 그래프) 2분할 레이아웃 */
+    .result-bottom-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 1024px) {
+      .result-bottom-grid {
+        grid-template-columns: 1fr;
+      }
+    }
 
     /* ROI 이미지 */
     .image-viewer {
@@ -260,14 +273,37 @@
       display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end;
     }
 
-    /* 환자용 간소화 스타일 */
+      /* 환자용 간소화 스타일 */
     .patient-result {
-      text-align: center; padding: 32px;
+      padding: 32px;
     }
-    .patient-diagnosis {
-      font-size: 32px; font-weight: 800; color: var(--primary);
-      margin: 16px 0;
+
+    /* 환자 결과 영역 가로 2분할 그리드 */
+   .patient-result-grid {
+  display: grid;
+  /* 왼쪽(영상)은 조금 좁게, 오른쪽(텍스트)은 조금 넓게 */
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr);
+  gap: 24px;
+  align-items: flex-start;
+}
+
+
+    @media (max-width: 1024px) {
+      .patient-result-grid {
+        grid-template-columns: 1fr;
+      }
     }
+
+  .patient-diagnosis {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 12px 0 8px;
+  line-height: 1.3;
+  word-break: keep-all;       /* 한국어 단어 중간에서 안 잘리게 */
+  overflow-wrap: break-word;  /* 너무 길면 적당히 줄바꿈 */
+}
+
     .patient-confidence {
       font-size: 18px; color: var(--accent); margin-bottom: 24px;
     }
@@ -275,6 +311,15 @@
       background: var(--surface-2); border-radius: 12px; padding: 24px;
       text-align: left; line-height: 1.8;
     }
+
+    .patient-roi-card {
+      background: var(--surface-2);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
 
     /* 유틸리티 */
     .hidden { display: none !important; }
@@ -511,37 +556,49 @@
               </div>
             </div>
 
-            <!-- ROI 이미지 표시 -->
-            <!-- 디버깅: boxed_image_data 존재 여부 확인 -->
-            <div style="font-size: 12px; color: #666; margin: 8px 0;">
-              디버깅: ROI 데이터 {{ 'O' if boxed_image_data else 'X' }}
-              {% if boxed_image_data %}(길이: {{ boxed_image_data|length }}){% endif %}
-            </div>
-            
-            {% if boxed_image_data %}
-            <div class="chart-container">
-              <h3 style="margin: 0 0 16px; font-size: 16px;">🎯 관심 영역 (ROI) 분석</h3>
-              <div style="text-align: center; background: #f8f9fa; border-radius: 8px; padding: 16px;">
-                <img src="data:image/png;base64,{{ boxed_image_data }}" 
-                     alt="ROI 분석 이미지" 
-                     style="max-width: 100%; height: auto; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
-                     onload="console.log('ROI 이미지 로드 성공: ' + this.naturalWidth + 'x' + this.naturalHeight)"
-                     onerror="console.log('ROI 이미지 로드 실패: ' + this.src.substring(0, 100) + '...')">
-                <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
-                  부비동 영역이 빨간 박스로 표시됩니다
+            <!-- ROI + 클래스별 확률을 가로 2분할로 표시 -->
+            <div class="result-bottom-grid">
+              <!-- 왼쪽: ROI / 디버깅 -->
+              <div>
+                <!-- 디버깅: ROI 데이터 존재 여부 확인 -->
+                <div style="font-size: 12px; color: #666; margin: 8px 0;">
+                  디버깅: ROI 데이터 {{ 'O' if boxed_image_data else 'X' }}
+                  {% if boxed_image_data %}(길이: {{ boxed_image_data|length }}){% endif %}
+                </div>
+
+                {% if boxed_image_data %}
+                <div class="chart-container">
+                  <h3 style="margin: 0 0 16px; font-size: 16px;">🎯 관심 영역 (ROI) 분석</h3>
+                  <div style="text-align: center; background: #f8f9fa; border-radius: 8px; padding: 16px;">
+                    <img src="data:image/png;base64,{{ boxed_image_data }}" 
+                         alt="ROI 분석 이미지" 
+                         style="max-width: 100%; height: auto; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+                         onload="console.log('ROI 이미지 로드 성공: ' + this.naturalWidth + 'x' + this.naturalHeight)"
+                         onerror="console.log('ROI 이미지 로드 실패: ' + this.src.substring(0, 100) + '...')">
+                    <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
+                      부비동 영역이 빨간 박스로 표시됩니다
+                    </div>
+                  </div>
+                </div>
+                {% else %}
+                <div class="chart-container">
+                  <h3 style="margin: 0 0 16px; font-size: 16px;">🎯 관심 영역 (ROI) 분석</h3>
+                  <div style="padding: 20px; text-align: center; color: #999; border: 1px dashed #ccc; border-radius: 8px;">
+                    ROI 분석 데이터가 없습니다
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- 오른쪽: 클래스별 확률 분포 -->
+              <div>
+                <div class="chart-container">
+                  <h3 style="margin: 0 0 16px; font-size: 16px;">클래스별 확률 분포</h3>
+                  <canvas id="probabilityChart" height="200"></canvas>
                 </div>
               </div>
             </div>
-            {% else %}
-            <div style="padding: 20px; text-align: center; color: #999; border: 1px dashed #ccc; border-radius: 8px;">
-              ROI 분석 데이터가 없습니다
-            </div>
-            {% endif %}
 
-            <div class="chart-container">
-              <h3 style="margin: 0 0 16px; font-size: 16px;">클래스별 확률 분포</h3>
-              <canvas id="probabilityChart" height="200"></canvas>
-            </div>
             {% else %}
             <div style="text-align: center; padding: 40px; color: var(--muted);">
               <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
@@ -735,68 +792,81 @@
       <div class="patient-layout">
         <div class="patient-card">
           <h1 style="margin: 0 0 24px; color: var(--primary);">부비동염 검사 결과</h1>
-          
+
           {% if prediction %}
           <div class="patient-result">
-            <div style="font-size: 18px; color: var(--muted); margin-bottom: 12px;">진단 결과</div>
-            <div class="patient-diagnosis">{{ prediction }}</div>
-            <div class="patient-confidence">신뢰도: {{ confidence | round(1) }}%</div>
-            
-            <!-- 환자용 ROI 이미지 표시 -->
-            <!-- 디버깅: boxed_image_data 존재 여부 확인 -->
-            <div style="font-size: 12px; color: #666; margin: 8px 0;">
-              디버깅: ROI 데이터 {{ 'O' if boxed_image_data else 'X' }}
-              {% if boxed_image_data %}(길이: {{ boxed_image_data|length }}){% endif %}
-            </div>
-            
-            {% if boxed_image_data %}
-            <div style="margin: 24px 0; text-align: center;">
-              <h3 style="color: var(--primary); margin-bottom: 16px;">🎯 검사 영상 분석 결과</h3>
-              <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; border: 2px solid #e9ecef;">
-                <img src="data:image/png;base64,{{ boxed_image_data }}" 
-                     alt="부비동 분석 이미지" 
-                     style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
-                     onload="console.log('환자용 ROI 이미지 로드 성공')"
-                     onerror="console.log('환자용 ROI 이미지 로드 실패')">
-                <div style="margin-top: 12px; font-size: 14px; color: var(--muted); line-height: 1.4;">
-                  <strong>빨간 박스</strong>는 AI가 분석한 부비동 영역을 표시합니다<br>
-                  좌측(L)과 우측(R) 수치는 각 부위의 이상 소견 정도를 나타냅니다
+            <div class="patient-result-grid">
+
+              <!-- 왼쪽: 검사 영상 분석 결과(ROI) -->
+              <div>
+                <!-- 디버깅: ROI 데이터 존재 여부 확인 -->
+                <div style="font-size: 12px; color: #666; margin: 8px 0;">
+                  디버깅: ROI 데이터 {{ 'O' if boxed_image_data else 'X' }}
+                  {% if boxed_image_data %}(길이: {{ boxed_image_data|length }}){% endif %}
+                </div>
+
+                {% if boxed_image_data %}
+                <div class="patient-roi-card">
+                  <h3 style="color: var(--primary); margin-top: 0; margin-bottom: 16px;">검사 영상 분석 결과</h3>
+                  <img src="data:image/png;base64,{{ boxed_image_data }}" 
+                       alt="부비동 분석 이미지" 
+                       style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+                       onload="console.log('환자용 ROI 이미지 로드 성공')"
+                       onerror="console.log('환자용 ROI 이미지 로드 실패')">
+                  <div style="margin-top: 12px; font-size: 14px; color: var(--muted); line-height: 1.4;">
+                    <strong>빨간 박스</strong>는 AI가 분석한 부비동 영역을 표시합니다<br>
+                    좌측(L)과 우측(R) 수치는 각 부위의 이상 소견 정도를 나타냅니다
+                  </div>
+                </div>
+                {% else %}
+                <div class="patient-roi-card">
+                  <h3 style="color: var(--primary); margin-top: 0; margin-bottom: 16px;">검사 영상 분석 결과</h3>
+                  <div style="padding: 20px; text-align: center; color: #999; border: 1px dashed #ccc; border-radius: 8px;">
+                    ROI 분석 데이터가 없습니다
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- 오른쪽: 진단 요약 + 설명 -->
+              <div>
+                <div style="font-size: 18px; color: var(--muted); margin-bottom: 12px;">진단 결과</div>
+                <!-- 글자 넘침 방지용 스타일 약간 줄임 -->
+                <div class="patient-diagnosis" style="font-size: 28px; line-height: 1.3; word-break: keep-all;">
+                  {{ prediction }}
+                </div>
+                <div class="patient-confidence">신뢰도: {{ confidence | round(1) }}%</div>
+
+                <div class="patient-explanation">
+                  <h3 style="color: var(--primary); margin-top: 0;">검사 결과 설명</h3>
+                  {% if 'Normal' in prediction or '정상' in prediction %}
+                  <p>🎉 <strong>좋은 소식입니다!</strong> 촬영된 X-ray 영상에서 부비동염의 뚜렷한 소견이 관찰되지 않았습니다.</p>
+                  <p>현재 부비동 상태가 정상 범위에 있는 것으로 판단됩니다. 하지만 증상이 지속되는 경우 담당 의료진과 상담하시기 바랍니다.</p>
+                  {% elif 'Left' in prediction or '좌측' in prediction %}
+                  <p>📍 좌측 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
+                  <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+                  {% elif 'Right' in prediction or '우측' in prediction %}
+                  <p>📍 우측 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
+                  <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+                  {% elif 'Both' in prediction or '양측' in prediction %}
+                  <p>📍 양쪽 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
+                  <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+                  {% else %}
+                  <p>촬영된 영상을 AI가 분석한 결과입니다.</p>
+                  <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
+                  {% endif %}
+                  
+                  <div style="margin-top: 24px; padding: 16px; background: rgba(21,101,192,0.1); border-radius: 8px;">
+                    <strong>💡 참고사항</strong><br>
+                    • 본 결과는 AI 보조 진단 결과입니다<br>
+                    • 최종 진단은 의료진과의 상담을 통해 결정됩니다<br>
+                    • 궁금한 점은 담당 의료진에게 문의해주세요
+                  </div>
                 </div>
               </div>
-            </div>
-            {% else %}
-            <div style="margin: 24px 0; padding: 20px; text-align: center; color: #999; border: 1px dashed #ccc; border-radius: 8px;">
-              ROI 분석 데이터가 없습니다
-            </div>
-            {% endif %}
-            
-            <div class="patient-explanation">
-              <h3 style="color: var(--primary); margin-top: 0;">검사 결과 설명</h3>
-              {% if 'Normal' in prediction or '정상' in prediction %}
-              <p>🎉 <strong>좋은 소식입니다!</strong> 촬영된 X-ray 영상에서 부비동염의 뚜렷한 소견이 관찰되지 않았습니다.</p>
-              <p>현재 부비동 상태가 정상 범위에 있는 것으로 판단됩니다. 하지만 증상이 지속되는 경우 담당 의료진과 상담하시기 바랍니다.</p>
-              {% elif 'Left' in prediction or '좌측' in prediction %}
-              <p>📍 좌측 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
-              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
-              {% elif 'Right' in prediction or '우측' in prediction %}
-              <p>📍 우측 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
-              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
-              {% elif 'Both' in prediction or '양측' in prediction %}
-              <p>📍 양쪽 부비동에 염증이나 이상 소견이 발견되었습니다.</p>
-              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
-              {% else %}
-              <p>촬영된 영상을 AI가 분석한 결과입니다.</p>
-              <p>정확한 진단과 치료 방향은 담당 의료진이 자세히 설명드릴 예정입니다.</p>
-              {% endif %}
-              
-              <div style="margin-top: 24px; padding: 16px; background: rgba(21,101,192,0.1); border-radius: 8px;">
-                <strong>💡 참고사항</strong><br>
-                • 본 결과는 AI 보조 진단 결과입니다<br>
-                • 최종 진단은 의료진과의 상담을 통해 결정됩니다<br>
-                • 궁금한 점은 담당 의료진에게 문의해주세요
-              </div>
-            </div>
-          </div>
+
+            </div> <!-- /.patient-result-grid -->
+          </div>   <!-- /.patient-result -->
           {% else %}
           <div style="padding: 40px; color: var(--muted);">
             <div style="font-size: 64px; margin-bottom: 24px;">🏥</div>
@@ -827,6 +897,7 @@
         {% endif %}
       </div>
     </div>
+
   </main>
 
   <!-- 서버 데이터 전달 -->
@@ -970,32 +1041,65 @@
       reader.readAsDataURL(file);
     }
 
-    // 폼 초기화
+        // 폼 초기화 + 결과 화면 리셋
     function resetForm() {
-      document.getElementById('uploadForm').reset();
-      document.getElementById('analyzeBtn').disabled = true;
-      document.getElementById('uploadStatus').style.display = 'none';
-      
-      // 파일 입력 초기화
-      const fileInput = document.getElementById('fileInput');
-      fileInput.value = '';
-      
-      // 상태 텍스트 초기화
-      const statusText = document.getElementById('statusText');
-      statusText.innerHTML = '파일을 선택해주세요';
-      statusText.style.color = 'var(--muted)';
+      // 1) 업로드 폼 / 버튼 / 상태 초기화
+      const form = document.getElementById('uploadForm');
+      if (form) form.reset();
 
-      // 업로드 영역 초기화
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      if (analyzeBtn) analyzeBtn.disabled = true;
+
+      const uploadStatus = document.getElementById('uploadStatus');
+      if (uploadStatus) uploadStatus.style.display = 'none';
+      
+      const fileInput = document.getElementById('fileInput');
+      if (fileInput) fileInput.value = '';
+      
+      const statusText = document.getElementById('statusText');
+      if (statusText) {
+        statusText.innerHTML = '파일을 선택해주세요';
+        statusText.style.color = 'var(--muted)';
+      }
+
       const uploadArea = document.getElementById('uploadArea');
-      uploadArea.style.borderColor = 'var(--border)';
-      uploadArea.style.backgroundColor = 'var(--surface-2)';
-      uploadArea.querySelector('.upload-text').textContent = '클릭하여 파일 선택';
-      uploadArea.querySelector('.upload-icon').textContent = '📁';
+      if (uploadArea) {
+        uploadArea.style.borderColor = 'var(--border)';
+        uploadArea.style.backgroundColor = 'var(--surface-2)';
+        const textEl = uploadArea.querySelector('.upload-text');
+        const iconEl = uploadArea.querySelector('.upload-icon');
+        if (textEl) textEl.textContent = '클릭하여 파일 선택';
+        if (iconEl) iconEl.textContent = '📁';
+      }
+
+      // 2) 오른쪽 AI 진단 결과 카드도 "처음 화면"으로 되돌리기
+      const resultCard = document.querySelector('.medical-results');
+      if (resultCard) {
+        resultCard.innerHTML = `
+          <h2>🎯 AI 진단 결과</h2>
+          <div style="text-align: center; padding: 40px; color: var(--muted);">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+            <div>AI 분석을 시작하려면 이미지를 업로드하고<br>분석 버튼을 클릭하세요</div>
+          </div>
+        `;
+      }
+
+      // 3) 근거 분석 탭의 상태도 초기화
+      const imageQualityEl = document.getElementById('imageQuality');
+      if (imageQualityEl) {
+        imageQualityEl.textContent = '분석 중...';
+      }
+
+      const roiDetectionEl = document.getElementById('roiDetection');
+      if (roiDetectionEl) {
+        roiDetectionEl.textContent = '대기 중';
+      }
     }
 
-    // 차트 초기화
+
+     // 차트 초기화 + 영상 품질 텍스트 업데이트
     document.addEventListener('DOMContentLoaded', function() {
-      // 신뢰도 바 애니메이션
+      // 1) 신뢰도 바 애니메이션
       const confidenceBar = document.querySelector('.confidence-bar-fill');
       if (confidenceBar) {
         const width = confidenceBar.getAttribute('data-width');
@@ -1006,6 +1110,7 @@
         }
       }
 
+      // 2) 클래스별 확률 차트
       const canvas = document.getElementById('probabilityChart');
       if (canvas) {
         let labels, probs;
@@ -1036,6 +1141,30 @@
               }
             }
           });
+        }
+      }
+
+      // 3) 근거 분석 탭 "영상 품질" 값 갱신 (신뢰도를 임시로 활용)
+      const imageQualityEl = document.getElementById('imageQuality');
+      const confidenceTextEl = document.querySelector('.confidence-text');
+
+      // prediction이 있을 때만 업데이트 (신뢰도 텍스트가 있는 경우)
+      if (imageQualityEl && confidenceTextEl) {
+        const text = confidenceTextEl.textContent || '';
+        const match = text.match(/(\d+(?:\.\d+)?)/);  // 숫자만 뽑기
+        if (match) {
+          const conf = parseFloat(match[1]); // 0~100
+
+          let label;
+          if (conf >= 90)      label = '매우 양호';
+          else if (conf >= 75) label = '양호';
+          else if (conf >= 60) label = '보통';
+          else                 label = '주의 필요';
+
+          imageQualityEl.textContent = `${label} (${conf.toFixed(1)}점 / 100)`;
+        } else {
+          // 신뢰도 못 읽으면 일단 "분석 완료"로만 변경
+          imageQualityEl.textContent = '분석 완료';
         }
       }
     });
